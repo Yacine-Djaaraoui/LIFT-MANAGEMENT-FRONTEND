@@ -46,18 +46,36 @@ export interface CalendarFilters {
 
 export const fetchCalendarEvents = async (filters: CalendarFilters = {}) => {
   const token = localStorage.getItem("access_token");
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
   const params = new URLSearchParams();
 
-  // Add filters to params
   Object.entries(filters).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
-      params.append(key, String(value));
+    if (
+      value !== undefined &&
+      value !== null &&
+      value !== "" &&
+      value !== "all"
+    ) {
+      // If value is an array → append each item (for city, province, etc.)
+      if (Array.isArray(value)) {
+        value.forEach((item) => params.append(key, String(item)));
+      } else {
+        params.append(key, String(value));
+      }
     }
   });
 
-  const response = await httpclient.get(`my-calendar/?${params.toString()}`, {
+  const url = "my-calendar/";
+  const queryString = params.toString();
+  const fullUrl = queryString ? `${url}?${queryString}` : url;
+
+  // Make sure headers stay inside the config object only
+  const response = await httpclient.get(fullUrl, {
     headers,
   });
+
   return response;
 };

@@ -425,11 +425,11 @@ export const generateInvoicePDF = (
     if (client.account_number)
       recipientLines.push(`Compte: ${client.account_number}`);
     if (client.fax) recipientLines.push(`Fax: ${client.fax}`);
-    if (client.is_corporate !== undefined) {
-      recipientLines.push(
-        `Type: ${client.is_corporate ? "Entreprise" : "Particulier"}`
-      );
-    }
+    // if (client.is_corporate !== undefined) {
+    //   recipientLines.push(
+    //     `Type: ${client.is_corporate ? "Entreprise" : "Particulier"}`
+    //   );
+    // }
   }
 
   let recipientInfoY = currentY;

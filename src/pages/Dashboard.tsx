@@ -58,7 +58,7 @@ export const Dashboard: React.FC = () => {
     },
     {
       title: "Revenu Total",
-      value: `${totalRevenue.toFixed(2)} €`,
+      value: `${totalRevenue.toFixed(2)} DA`,
       subtitle: `${pendingInvoices} factures en attente`,
       icon: Euro,
       color: "purple",

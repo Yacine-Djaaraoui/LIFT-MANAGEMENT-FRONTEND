@@ -6,6 +6,7 @@ import { useCreateAssistant, useUpdateAssistant } from "@/hooks/useAssistants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,9 @@ const assistantSchema = yup.object({
   first_name: yup.string().nullable().optional(),
   last_name: yup.string().nullable().optional(),
   wilaya: yup.string().nullable().optional(),
+  can_see_selling_price: yup.boolean().default(false),
+  can_edit_selling_price: yup.boolean().default(false),
+  can_edit_buying_price: yup.boolean().default(false),
 });
 
 type AssistantFormData = yup.InferType<typeof assistantSchema>;
@@ -50,6 +54,8 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
     formState: { errors },
     reset,
     setValue,
+    watch,
+    getValues,
   } = useForm<AssistantFormData>({
     resolver: yupResolver(assistantSchema),
     defaultValues: {
@@ -60,8 +66,16 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
       first_name: "",
       last_name: "",
       wilaya: "",
+      can_see_selling_price: false,
+      can_edit_selling_price: false,
+      can_edit_buying_price: false,
     },
   });
+
+  // Watch the permission fields
+  const canSeeSellingPrice = watch("can_see_selling_price");
+  const canEditSellingPrice = watch("can_edit_selling_price");
+  const canEditBuyingPrice = watch("can_edit_buying_price");
 
   // Reset and pre-fill form when assistant changes or dialog opens
   useEffect(() => {
@@ -75,6 +89,21 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
       setValue("first_name", assistant.first_name || "");
       setValue("last_name", assistant.last_name || "");
       setValue("wilaya", assistant.wilaya || "");
+
+      // Set permission fields - ensure they are boolean
+      setValue(
+        "can_see_selling_price",
+        Boolean(assistant.can_see_selling_price)
+      );
+      setValue(
+        "can_edit_selling_price",
+        Boolean(assistant.can_edit_selling_price)
+      );
+      setValue(
+        "can_edit_buying_price",
+        Boolean(assistant.can_edit_buying_price)
+      );
+
       // Don't pre-fill password for security reasons
       setValue("password", "");
     } else if (open && !assistant) {
@@ -87,13 +116,30 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
         first_name: "",
         last_name: "",
         wilaya: "",
+        can_see_selling_price: false,
+        can_edit_selling_price: false,
+        can_edit_buying_price: false,
       });
     }
   }, [open, assistant, reset, setValue]);
 
+  // Handle checkbox changes properly
+  const handleCheckboxChange = (
+    field: keyof AssistantFormData,
+    checked: boolean
+  ) => {
+    setValue(field, checked, { shouldValidate: true });
+  };
+
   const onSubmit = async (data: AssistantFormData) => {
     try {
       console.log("Form submitted with data:", data);
+      console.log("Permission values:", {
+        can_see_selling_price: data.can_see_selling_price,
+        can_edit_selling_price:
+          data.can_edit_selling_price && data.can_see_selling_price,
+        can_edit_buying_price: data.can_edit_buying_price,
+      });
 
       if (assistant) {
         // UPDATE MODE - Send only changed fields
@@ -119,6 +165,13 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
           submitData.wilaya = data.wilaya || null;
         }
 
+        // Permission fields - always send if they exist in the form
+        submitData.can_see_selling_price = Boolean(data.can_see_selling_price);
+        submitData.can_edit_selling_price = Boolean(
+          data.can_edit_selling_price && data.can_see_selling_price
+        );
+        submitData.can_edit_buying_price = Boolean(data.can_edit_buying_price);
+
         // Password - only if provided
         if (data.password && data.password.trim() !== "") {
           submitData.password = data.password;
@@ -126,22 +179,20 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
 
         console.log("Updating assistant with data:", submitData);
 
-        // Only call update if there are changes
-        if (Object.keys(submitData).length > 0) {
-          await updateMutation.mutateAsync({
-            id: assistant.id,
-            data: submitData,
-          });
-        } else {
-          console.log("No changes detected");
-          handleClose();
-          return;
-        }
+        await updateMutation.mutateAsync({
+          id: assistant.id,
+          data: submitData,
+        });
       } else {
         // CREATE MODE - Send all required fields
         const createData: any = {
           username: data.username || "",
           password: data.password || "",
+          can_see_selling_price: Boolean(data.can_see_selling_price),
+          can_edit_selling_price: Boolean(
+            data.can_edit_selling_price && data.can_see_selling_price
+          ),
+          can_edit_buying_price: Boolean(data.can_edit_buying_price),
         };
 
         // Include optional fields only if they have values
@@ -170,7 +221,7 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {assistant ? "Modifier l'Assistant" : "Créer un Nouvel Assistant"}
@@ -292,6 +343,109 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
                   Laisser vide pour garder la valeur actuelle
                 </p>
               )}
+            </div>
+          </div>
+
+          {/* Permissions Section */}
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-medium mb-4">Permissions</h3>
+            <div className="grid grid-cols-1 gap-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="can_see_selling_price"
+                  checked={canSeeSellingPrice}
+                  onCheckedChange={(checked) =>
+                    handleCheckboxChange(
+                      "can_see_selling_price",
+                      checked as boolean
+                    )
+                  }
+                />
+                <Label
+                  htmlFor="can_see_selling_price"
+                  className="cursor-pointer"
+                >
+                  Peut voir le prix de vente
+                </Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="can_edit_selling_price"
+                  checked={canEditSellingPrice}
+                  onCheckedChange={(checked) =>
+                    handleCheckboxChange(
+                      "can_edit_selling_price",
+                      checked as boolean
+                    )
+                  }
+                  disabled={!canSeeSellingPrice}
+                />
+                <Label
+                  htmlFor="can_edit_selling_price"
+                  className={`cursor-pointer ${
+                    !canSeeSellingPrice ? "text-gray-400" : ""
+                  }`}
+                >
+                  Peut modifier le prix de vente
+                </Label>
+                {!canSeeSellingPrice && (
+                  <span className="text-xs text-gray-500 ml-2">
+                    (Nécessite "Peut voir le prix de vente")
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="can_edit_buying_price"
+                  checked={canEditBuyingPrice}
+                  onCheckedChange={(checked) =>
+                    handleCheckboxChange(
+                      "can_edit_buying_price",
+                      checked as boolean
+                    )
+                  }
+                />
+                <Label
+                  htmlFor="can_edit_buying_price"
+                  className="cursor-pointer"
+                >
+                  Peut modifier le prix d'achat
+                </Label>
+              </div>
+            </div>
+
+            {/* Current Values Display (for debugging) */}
+            <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-md">
+              <p className="text-sm text-gray-700">
+                <strong>Valeurs actuelles des permissions:</strong>
+                <div className="mt-1 text-xs">
+                  Voir prix vente: {canSeeSellingPrice ? "Oui" : "Non"} |
+                  Modifier prix vente: {canEditSellingPrice ? "Oui" : "Non"} |
+                  Modifier prix achat: {canEditBuyingPrice ? "Oui" : "Non"}
+                </div>
+              </p>
+            </div>
+
+            {/* Permissions Help Text */}
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm text-blue-700">
+                <strong>Note sur les permissions :</strong>
+                <ul className="list-disc list-inside mt-1 space-y-1">
+                  <li>
+                    "Peut modifier le prix de vente" nécessite "Peut voir le
+                    prix de vente"
+                  </li>
+                  <li>
+                    La modification du prix d'achat est une permission sensible
+                  </li>
+                  <li>
+                    Ces permissions affectent l'accès aux données sensibles dans
+                    le stock
+                  </li>
+                </ul>
+              </p>
             </div>
           </div>
 

@@ -8,15 +8,17 @@ import {
   FileText,
   BarChart3,
   Settings,
+  Receipt,
 } from "lucide-react";
-
+import logo from "@/assets/kr7_logo-1-removebg-preview.png";
 const menuItems = [
-  { path: "/dashboard", label: "Tableau de Bord", icon: LayoutDashboard },
+  { path: "/statistics", label: "Tableau de Bord", icon: LayoutDashboard },
   { path: "/stock", label: "Stock", icon: Package },
   { path: "/clients", label: "Clients", icon: Users },
   { path: "/projects", label: "Projets", icon: FileText },
+  { path: "/invoices", label: "Factures", icon: Receipt },
   { path: "/calendar", label: "Calendrier", icon: Calendar },
-  { path: "/statistics", label: "Statistiques", icon: BarChart3 },
+  // { path: "/statistics", label: "Statistiques", icon: BarChart3 },
   { path: "/employers", label: "Employés", icon: Users },
   { path: "/assistants", label: "Assistants", icon: Settings },
 ];
@@ -26,8 +28,9 @@ export const Sidebar: React.FC = () => {
 
   return (
     <div className="w-64 bg-white shadow-lg h-screen fixed left-0 top-0">
+      <img src={logo} alt="" className="w-40 mx-auto" />
       <div className="p-6">
-        <h1 className="text-xl font-bold text-gray-800">Lift Management</h1>
+        <h1 className="text-xl font-bold text-gray-800">EURL KR7 FIBRE</h1>
       </div>
 
       <nav className="mt-8">

@@ -99,22 +99,47 @@ export const Clients: React.FC = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nom</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Téléphone</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Adresse</TableHead>
-              <TableHead>Date de création</TableHead>
-              <TableHead>Actions</TableHead>
+              <TableHead className="text-left">Nom</TableHead>
+              <TableHead className="text-left">Type</TableHead>
+              <TableHead className="text-left">Téléphone</TableHead>
+              <TableHead className="text-left">Email</TableHead>
+              <TableHead className="text-left">Adresse</TableHead>
+              <TableHead className="text-left">Date de création</TableHead>
+              <TableHead className="text-left">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-4">
-                  Chargement...
-                </TableCell>
-              </TableRow>
+              <>
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <TableRow key={index} className="animate-pulse">
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-6 bg-gray-200 rounded w-20"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="flex space-x-2">
+                        <div className="h-8 w-8 bg-gray-200 rounded"></div>
+                        <div className="h-8 w-8 bg-gray-200 rounded"></div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </>
             ) : clientsData?.results?.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-4">
@@ -124,25 +149,31 @@ export const Clients: React.FC = () => {
             ) : (
               clientsData?.results?.map((client: any) => (
                 <TableRow key={client.id}>
-                  <TableCell className="font-medium">{client.name}</TableCell>
-                  <TableCell>
+                  <TableCell className="font-medium text-left">
+                    {client.name}
+                  </TableCell>
+                  <TableCell className="text-left">
                     <div className="flex items-center">
                       {client.is_corporate ? (
                         <>
-                          <Building className="w-4 h-4 mr-1 text-blue-600" />
+                          <Building className="w-4 h-4 mr-2 text-blue-600" />
                           <span>Entreprise</span>
                         </>
                       ) : (
                         <>
-                          <User className="w-4 h-4 mr-1 text-green-600" />
+                          <User className="w-4 h-4 mr-2 text-green-600" />
                           <span>Particulier</span>
                         </>
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>{client.phone_number}</TableCell>
-                  <TableCell>{client.email || "-"}</TableCell>
-                  <TableCell>
+                  <TableCell className="text-left">
+                    {client.phone_number}
+                  </TableCell>
+                  <TableCell className="text-left">
+                    {client.email || "-"}
+                  </TableCell>
+                  <TableCell className="text-left">
                     {client.address ? (
                       <div className="text-sm">
                         {client.address.street && (
@@ -156,10 +187,10 @@ export const Clients: React.FC = () => {
                       "-"
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-left">
                     {new Date(client.created_at).toLocaleDateString("fr-FR")}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-left">
                     <div className="flex space-x-2">
                       <Button
                         variant="outline"

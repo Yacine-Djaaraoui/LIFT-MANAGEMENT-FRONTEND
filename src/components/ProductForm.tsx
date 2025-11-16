@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useCurrentUser } from "@/hooks/useAuth";
 
 // Make optional fields truly optional with proper transformation
 const productSchema = yup.object({
@@ -59,6 +60,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   onClose,
   product,
 }) => {
+  const { data: user } = useCurrentUser();
+
   const createMutation = useCreateProduct();
   const updateMutation = useUpdateProduct();
 
@@ -128,7 +131,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       // Only include optional fields if they have values
       if (data.sku) apiData.sku = data.sku;
       if (data.unit) apiData.unit = data.unit;
-
 
       if (product) {
         // For update, only send changed fields
@@ -251,20 +253,24 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             <h3 className="text-lg font-medium">Informations de Prix</h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="buying_price">Prix d'Achat (€)</Label>
-                <Input
-                  id="buying_price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  {...register("buying_price", { valueAsNumber: true })}
-                />
-              </div>
+              {user?.can_see_selling_price && (
+                <div>
+                  <Label htmlFor="buying_price">Prix d'Achat (DA)</Label>
+                  <Input
+                    disabled={!user?.can_edit_selling_price}
+                    id="buying_price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    {...register("buying_price", { valueAsNumber: true })}
+                  />
+                </div>
+              )}
 
               <div>
-                <Label htmlFor="selling_price">Prix de Vente (€)</Label>
+                <Label htmlFor="selling_price">Prix de Vente (DA)</Label>
                 <Input
+                  disabled={!user?.can_edit_buying_price}
                   id="selling_price"
                   type="number"
                   step="0.01"
@@ -275,14 +281,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             </div>
 
             {/* Profit Calculation */}
-            {(buyingPrice > 0 || sellingPrice > 0) && (
+            {/* {(buyingPrice > 0 || sellingPrice > 0) && (
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h4 className="font-medium mb-2">Calcul de Marge</h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-gray-600">Bénéfice/unité:</span>
                     <div className="font-medium">
-                      {profitPerUnit.toFixed(2)} €
+                      {profitPerUnit.toFixed(2)} DA
                     </div>
                   </div>
                   <div>
@@ -293,11 +299,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   </div>
                 </div>
               </div>
-            )}
+            )} */}
           </div>
 
           {/* Current Values Display (for update) */}
-          {product && (
+          {/* {product && (
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <h4 className="font-medium text-blue-800 mb-2">
                 Valeurs Actuelles
@@ -312,18 +318,18 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 <div>
                   <span className="text-blue-600">Prix d'achat actuel:</span>
                   <div className="font-medium">
-                    {parseFloat(product.buying_price).toFixed(2)} €
+                    {parseFloat(product.buying_price).toFixed(2)} DA
                   </div>
                 </div>
                 <div>
                   <span className="text-blue-600">Prix de vente actuel:</span>
                   <div className="font-medium">
-                    {parseFloat(product.selling_price).toFixed(2)} €
+                    {parseFloat(product.selling_price).toFixed(2)} DA
                   </div>
                 </div>
               </div>
             </div>
-          )}
+          )} */}
 
           {/* Form Information */}
           <div className="bg-gray-50 p-3 rounded-lg">

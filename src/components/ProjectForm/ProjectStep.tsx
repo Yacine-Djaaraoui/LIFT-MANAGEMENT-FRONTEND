@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
@@ -64,11 +64,14 @@ export const ProjectStep: React.FC<ProjectStepProps> = ({
   onBack,
   initialData,
 }) => {
+  const [warrantyEndDate, setWarrantyEndDate] = useState<string>("");
+
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
+    watch,
   } = useForm<ProjectFormData>({
     resolver: yupResolver(projectSchema),
     defaultValues: {
@@ -83,6 +86,46 @@ export const ProjectStep: React.FC<ProjectStepProps> = ({
       interval_maintenance: null,
     },
   });
+
+  // Watch warranty fields and start date to calculate warranty end date
+  const startDate = watch("start_date");
+  const warrantyYears = watch("warranty_years");
+  const warrantyMonths = watch("warranty_months");
+  const warrantyDays = watch("warranty_days");
+
+  // Format date for display (DD/MM/YYYY)
+  const formatDateForDisplay = (dateString: string) => {
+    if (!dateString) return "";
+
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, "0");
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const year = date.getFullYear();
+
+    return `${day}/${month}/${year}`;
+  };
+
+  // Calculate warranty end date when warranty fields or start date change
+  useEffect(() => {
+    if (startDate) {
+      const start = new Date(startDate);
+      const end = new Date(start);
+
+      // Add years, months, and days
+      end.setFullYear(end.getFullYear() + (warrantyYears || 0));
+      end.setMonth(end.getMonth() + (warrantyMonths || 0));
+      end.setDate(end.getDate() + (warrantyDays || 0));
+
+      // Format the date for display (DD/MM/YYYY)
+      const formattedDate = formatDateForDisplay(
+        end.toISOString().split("T")[0]
+      );
+
+      setWarrantyEndDate(formattedDate);
+    } else {
+      setWarrantyEndDate("");
+    }
+  }, [startDate, warrantyYears, warrantyMonths, warrantyDays]);
 
   // Reset form with initial data when it changes
   useEffect(() => {
@@ -135,6 +178,11 @@ export const ProjectStep: React.FC<ProjectStepProps> = ({
               Date de Début <span className="text-red-500">*</span>
             </Label>
             <Input id="start_date" type="date" {...register("start_date")} />
+            {startDate && (
+              <p className="text-xs text-gray-500 mt-1">
+                Date sélectionnée: {formatDateForDisplay(startDate)}
+              </p>
+            )}
             {errors.start_date && (
               <p className="text-red-500 text-sm mt-1">
                 {errors.start_date.message}
@@ -147,6 +195,11 @@ export const ProjectStep: React.FC<ProjectStepProps> = ({
               Date de Fin <span className="text-gray-500">(Optionnel)</span>
             </Label>
             <Input id="end_date" type="date" {...register("end_date")} />
+            {watch("end_date") && (
+              <p className="text-xs text-gray-500 mt-1">
+                Date sélectionnée: {formatDateForDisplay(watch("end_date"))}
+              </p>
+            )}
             {errors.end_date && (
               <p className="text-red-500 text-sm mt-1">
                 {errors.end_date.message}
@@ -200,6 +253,21 @@ export const ProjectStep: React.FC<ProjectStepProps> = ({
               />
             </div>
           </div>
+
+          {/* Warranty End Date Display */}
+          {(warrantyYears > 0 || warrantyMonths > 0 || warrantyDays > 0) &&
+            startDate && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="text-sm text-blue-700">
+                  <strong>Date de fin de garantie calculée :</strong>{" "}
+                  {warrantyEndDate}
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Basée sur la date de début du projet plus la durée de garantie
+                  spécifiée
+                </p>
+              </div>
+            )}
         </div>
 
         {/* Maintenance Information */}

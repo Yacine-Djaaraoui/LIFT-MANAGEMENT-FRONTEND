@@ -97,23 +97,48 @@ export const Stock: React.FC = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nom</TableHead>
-              <TableHead>SKU</TableHead>
-              <TableHead>Quantité</TableHead>
-              <TableHead>Prix d'achat</TableHead>
-              <TableHead>Prix de vente</TableHead>
-              {/* <TableHead>Marge</TableHead> */}
-              <TableHead>Statut</TableHead>
-              <TableHead>Actions</TableHead>
+              <TableHead className="text-left">Nom</TableHead>
+              <TableHead className="text-left">SKU</TableHead>
+              <TableHead className="text-left">Quantité</TableHead>
+              <TableHead className="text-left">Prix d'achat</TableHead>
+              <TableHead className="text-left">Prix de vente</TableHead>
+              {/* <TableHead className="text-left">Marge</TableHead> */}
+              <TableHead className="text-left">Statut</TableHead>
+              <TableHead className="text-left">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-4">
-                  Chargement...
-                </TableCell>
-              </TableRow>
+              <>
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <TableRow key={index} className="animate-pulse">
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-6 bg-gray-200 rounded w-20"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="flex space-x-2">
+                        <div className="h-8 w-8 bg-gray-200 rounded"></div>
+                        <div className="h-8 w-8 bg-gray-200 rounded"></div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </>
             ) : productsData?.results?.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-4">
@@ -123,9 +148,13 @@ export const Stock: React.FC = () => {
             ) : (
               productsData?.results?.map((product: any) => (
                 <TableRow key={product.id}>
-                  <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell>{product.sku || "-"}</TableCell>
-                  <TableCell>
+                  <TableCell className="font-medium text-left">
+                    {product.name}
+                  </TableCell>
+                  <TableCell className="text-left">
+                    {product.sku || "-"}
+                  </TableCell>
+                  <TableCell className="text-left">
                     <div className="flex items-center space-x-2">
                       <span>
                         {product.quantity} {product.unit}
@@ -135,12 +164,16 @@ export const Stock: React.FC = () => {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>{product.buying_price} DA</TableCell>
-                  <TableCell>{product.selling_price} DA</TableCell>
-                  {/* <TableCell>
+                  <TableCell className="text-left">
+                    {product.buying_price} DA
+                  </TableCell>
+                  <TableCell className="text-left">
+                    {product.selling_price} DA
+                  </TableCell>
+                  {/* <TableCell className="text-left">
                     {product.calculate_profit_margin?.toFixed(2)}%
                   </TableCell> */}
-                  <TableCell>
+                  <TableCell className="text-left">
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-medium ${
                         product.is_low_stock
@@ -151,7 +184,7 @@ export const Stock: React.FC = () => {
                       {product.is_low_stock ? "Stock faible" : "En stock"}
                     </span>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-left">
                     <div className="flex space-x-2">
                       <Button
                         variant="outline"

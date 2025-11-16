@@ -2,13 +2,15 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   fetchInvoices,
   fetchInvoice,
-  createInvoiceLine,
+  createInvoiceLines,
   updateInvoiceLine,
   deleteInvoiceLine,
   createInvoice,
   updateInvoice,
   deleteInvoice,
+  updateInvoiceStatus,
 } from "@/api/invoices";
+import { data } from "react-router-dom";
 
 export const useInvoices = (
   {
@@ -97,12 +99,11 @@ export const useDeleteInvoice = () => {
   });
 };
 
-
-export const useCreateInvoiceLine = () => {
+export const useCreateInvoiceLines = () => {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: ({ invoiceId, data }: { invoiceId: string; data: any }) =>
-      createInvoiceLine(invoiceId, data),
+    mutationFn: createInvoiceLines,
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: ["invoice-lines", variables.invoiceId],
@@ -110,6 +111,24 @@ export const useCreateInvoiceLine = () => {
       queryClient.invalidateQueries({
         queryKey: ["invoice", variables.invoiceId],
       });
+    },
+  });
+};
+// Add this to your existing /hooks/useInvoices.ts file
+
+export const useUpdateInvoiceStatus = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      action,
+    }: {
+      id: string;
+      action: "issue" | "mark_paid" | "revert_to_draft";
+    }) => updateInvoiceStatus(id, { action }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice", variables.id] });
     },
   });
 };

@@ -15,6 +15,7 @@ import {
 import { Plus, Trash2, Search } from "lucide-react";
 import { useProducts } from "@/hooks/useProducts";
 import { useInvoices } from "@/hooks/useInvoices";
+import { useCurrentUser } from "@/hooks/useAuth";
 
 const invoiceSchema = yup.object({
   due_date: yup.string().optional(),
@@ -60,10 +61,10 @@ export const InvoiceStep: React.FC<InvoiceStepProps> = ({
   const [productSearch, setProductSearch] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [openSelectId, setOpenSelectId] = useState<string | null>(null);
+  const { data: user, isLoading } = useCurrentUser();
 
   const { data: products } = useProducts({
     search: productSearch,
-    page_size: 300,
   });
 
   // Fetch existing invoice if projectId is provided (for editing)
@@ -457,6 +458,7 @@ export const InvoiceStep: React.FC<InvoiceStepProps> = ({
                     <div>
                       <Label>Prix Unitaire (DA)</Label>
                       <Input
+                        disabled={!user?.can_edit_buying_price}
                         type="number"
                         step="0.01"
                         min="0"

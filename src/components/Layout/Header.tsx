@@ -5,9 +5,9 @@ export const Header: React.FC = () => {
   const { data: user } = useCurrentUser();
 
   return (
-    <header className="bg-white shadow-sm border-b px-6 py-4">
+    <header className="bg-white shadow-sm border-b px-6 py-4 ">
       <div className="flex justify-between items-center">
-        <div>
+        <div className="flex-col flex items-start justify-cetner">
           <h2 className="text-lg font-semibold text-gray-800">
             Bonjour, {user?.first_name || user?.username}
           </h2>
@@ -17,10 +17,10 @@ export const Header: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-4">
-          <button className="p-2 text-gray-600 hover:text-gray-800">
+          {/* <button className="p-2 text-gray-600 hover:text-gray-800">
             <span className="sr-only">Notifications</span>
             🔔
-          </button>
+          </button> */}
           <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
             {user?.first_name?.[0] || user?.username?.[0] || "U"}
           </div>

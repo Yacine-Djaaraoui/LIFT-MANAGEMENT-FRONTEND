@@ -5,12 +5,14 @@ import { Dashboard } from "@/pages/Dashboard";
 import { Stock } from "@/pages/Stock";
 import { Clients } from "@/pages/Clients";
 import { Projects } from "@/pages/Projects";
-import {  CalendarComponent } from "@/pages/Calendar";
+import { Invoices } from "@/pages/Invoices";
+import { CalendarComponent } from "@/pages/Calendar";
 import { Statistics } from "@/pages/Statistics";
 import { Employers } from "@/pages/Employers";
 import { Assistants } from "@/pages/Assistants";
 import { Layout } from "@/components/Layout/Layout";
 import { useCurrentUser } from "@/hooks/useAuth";
+import { ScrollToTop } from "@/components/ScrollToTop";
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -37,103 +39,119 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const token = localStorage.getItem("access_token");
 
   if (token) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/statistics" replace />;
   }
 
   return <>{children}</>;
 };
 
 export const AllRoutes: React.FC = () => {
+  const { data: user, isLoading } = useCurrentUser();
+
   return (
-    <Routes>
-      {/* Public Routes */}
-      <Route
-        path="/login"
-        element={
-          <PublicRoute>
-            <Login />
-          </PublicRoute>
-        }
-      />
+    <>
+      <ScrollToTop /> {/* <-- added here, works for ALL pages */}
+      <Routes>
+        {/* Public Routes */}
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <Login />
+            </PublicRoute>
+          }
+        />
 
-      {/* Protected Routes */}
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
+        {/* Protected Routes */}
+        <Route
+          path="/statistics"
+          element={
+            <ProtectedRoute>
+              <Statistics />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/stock"
-        element={
-          <ProtectedRoute>
-            <Stock />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/stock"
+          element={
+            <ProtectedRoute>
+              <Stock />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/clients"
-        element={
-          <ProtectedRoute>
-            <Clients />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/clients"
+          element={
+            <ProtectedRoute>
+              <Clients />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/projects"
-        element={
-          <ProtectedRoute>
-            <Projects />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/projects"
+          element={
+            <ProtectedRoute>
+              <Projects />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/calendar"
-        element={
-          <ProtectedRoute>
-            <CalendarComponent />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/invoices"
+          element={
+            <ProtectedRoute>
+              <Invoices />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/statistics"
-        element={
-          <ProtectedRoute>
-            <Statistics />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/calendar"
+          element={
+            <ProtectedRoute>
+              <CalendarComponent />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/employers"
-        element={
-          <ProtectedRoute>
-            <Employers />
-          </ProtectedRoute>
-        }
-      />
+        {/* {user?.role === "ADMIN" && (
+        <Route
+          path="/statistics"
+          element={
+            <ProtectedRoute>
+              <Statistics />
+            </ProtectedRoute>
+          }
+        />
+      )} */}
 
-      <Route
-        path="/assistants"
-        element={
-          <ProtectedRoute>
-            <Assistants />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/employers"
+          element={
+            <ProtectedRoute>
+              <Employers />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Default redirect */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route
+          path="/assistants"
+          element={
+            <ProtectedRoute>
+              <Assistants />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* 404 fallback */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+        {/* Default redirect */}
+        <Route path="/" element={<Navigate to="/statistics" replace />} />
+
+        {/* 404 fallback */}
+        <Route path="*" element={<Navigate to="/statistics" replace />} />
+      </Routes>
+    </>
   );
 };

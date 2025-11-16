@@ -6,6 +6,7 @@ import {
   updateProject,
   deleteProject,
   verifyProject,
+  UnverifyProject,
 } from "@/api/projects";
 
 export const useProjects = (
@@ -17,6 +18,7 @@ export const useProjects = (
     client,
     is_verified,
     status,
+    city,
   }: {
     ordering?: string;
     search?: string;
@@ -25,6 +27,7 @@ export const useProjects = (
     client?: string;
     is_verified?: boolean;
     status?: string;
+    city?: string;
   } = {},
   options?: any
 ) => {
@@ -39,6 +42,7 @@ export const useProjects = (
         client,
         is_verified,
         status,
+        city,
       },
     ],
     queryFn: () =>
@@ -50,6 +54,7 @@ export const useProjects = (
         client,
         is_verified,
         status,
+        city,
       }),
     staleTime: 1000 * 60 * 5,
     ...options,
@@ -100,6 +105,16 @@ export const useVerifyProject = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: verifyProject,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["project", variables] });
+    },
+  });
+};
+export const useUnVerifyProject = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: UnverifyProject,
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       queryClient.invalidateQueries({ queryKey: ["project", variables] });

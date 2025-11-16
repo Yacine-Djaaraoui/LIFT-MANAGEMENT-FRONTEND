@@ -46,11 +46,17 @@ export const createAssistant = async ({
   password,
   first_name,
   last_name,
+  can_see_selling_price,
+  can_edit_selling_price,
+  can_edit_buying_price,
   wilaya,
 }: {
   username: string;
   email?: string;
   phone_number?: string;
+  can_see_selling_price?: boolean;
+  can_edit_selling_price?: boolean;
+  can_edit_buying_price?: boolean;
   password: string;
   first_name?: string;
   last_name?: string;
@@ -66,6 +72,9 @@ export const createAssistant = async ({
       email,
       phone_number,
       password,
+      can_see_selling_price,
+      can_edit_selling_price,
+      can_edit_buying_price,
       first_name,
       last_name,
       wilaya,
@@ -84,8 +93,14 @@ export const updateAssistant = async (
     first_name,
     last_name,
     wilaya,
+    can_see_selling_price,
+    can_edit_selling_price,
+    can_edit_buying_price,
   }: {
     username?: string;
+    can_see_selling_price?: boolean;
+    can_edit_selling_price?: boolean;
+    can_edit_buying_price?: boolean;
     email?: string;
     phone_number?: string;
     first_name?: string;
@@ -103,6 +118,9 @@ export const updateAssistant = async (
       email,
       phone_number,
       first_name,
+      can_see_selling_price,
+      can_edit_selling_price,
+      can_edit_buying_price,
       last_name,
       wilaya,
     },

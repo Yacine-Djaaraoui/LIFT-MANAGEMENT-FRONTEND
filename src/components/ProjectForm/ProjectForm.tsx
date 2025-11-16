@@ -19,9 +19,8 @@ import { ReviewStep } from "./ReviewStep";
 import {
   useCreateInvoice,
   useUpdateInvoice,
-  useUpdateInvoiceLine,
   useDeleteInvoiceLine,
-  useCreateInvoiceLine,
+  useCreateInvoiceLines,
   useInvoices,
 } from "@/hooks/useInvoices";
 
@@ -66,37 +65,6 @@ const retryWithBackoff = async (
   }
 
   throw lastError;
-};
-
-// Batch operations to reduce concurrent database access
-const batchOperations = async (
-  operations: (() => Promise<any>)[],
-  batchSize = 3,
-  delayBetweenBatches = 100
-) => {
-  const results = [];
-
-  for (let i = 0; i < operations.length; i += batchSize) {
-    const batch = operations.slice(i, i + batchSize);
-    console.log(
-      `Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(
-        operations.length / batchSize
-      )}`
-    );
-
-    const batchResults = await Promise.allSettled(
-      batch.map((op) => retryWithBackoff(op))
-    );
-
-    results.push(...batchResults);
-
-    // Add delay between batches if not the last batch
-    if (i + batchSize < operations.length) {
-      await new Promise((resolve) => setTimeout(resolve, delayBetweenBatches));
-    }
-  }
-
-  return results;
 };
 
 // Helper function to remove empty values but keep 0, false, etc.
@@ -182,9 +150,8 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
   const updateProjectMutation = useUpdateProject();
   const createInvoiceMutation = useCreateInvoice();
   const updateInvoiceMutation = useUpdateInvoice();
-  const updateInvoiceLineMutation = useUpdateInvoiceLine();
   const deleteInvoiceLineMutation = useDeleteInvoiceLine();
-  const createInvoiceLineMutation = useCreateInvoiceLine();
+  const createInvoiceLinesMutation = useCreateInvoiceLines();
 
   // Fetch existing invoice if projectId is provided (for editing)
   const { data: existingInvoiceData } = useInvoices(
@@ -378,146 +345,90 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
     setStep(step - 1);
   };
 
-  // Function to handle ALL invoice line operations (create, update, delete)
+  // FUNCTION: Delete all existing invoice lines one by one
+  const deleteAllExistingLines = async (invoiceId: string) => {
+    console.log(
+      "🗑️ DELETING ALL existing invoice lines for invoice:",
+      invoiceId
+    );
+    console.log("📋 Lines to delete:", existingInvoiceLines);
+
+    if (existingInvoiceLines.length === 0) {
+      console.log("ℹ️ No existing lines to delete");
+      return;
+    }
+
+    try {
+      console.log(
+        `🗑️ Starting deletion of ${existingInvoiceLines.length} lines`
+      );
+
+      // Delete lines one by one with retry logic
+      for (const line of existingInvoiceLines) {
+        await retryWithBackoff(() =>
+          deleteInvoiceLineMutation.mutateAsync({
+            invoiceId,
+            lineId: line.id,
+          })
+        );
+        console.log(`✅ Deleted line: ${line.id}`);
+      }
+
+      console.log("✅ All existing lines deleted successfully");
+    } catch (error) {
+      console.error("❌ Error deleting existing lines:", error);
+      throw error;
+    }
+  };
+
+  // FUNCTION: Create all new invoice lines in one batch
+  const createAllNewLines = async (invoiceId: string, newLines: any[]) => {
+    console.log("➕ CREATING ALL new invoice lines for invoice:", invoiceId);
+    console.log("📋 New lines to create:", newLines);
+
+    // Filter out empty lines and clean the data
+    const linesToCreate = newLines
+      .map((line) => cleanInvoiceLineData(line))
+      .filter((line) => Object.keys(line).length > 0);
+
+    if (linesToCreate.length === 0) {
+      console.log("ℹ️ No new lines to create");
+      return [];
+    }
+
+    // Use createInvoiceLinesMutation to create all lines in one API call
+    await retryWithBackoff(() =>
+      createInvoiceLinesMutation.mutateAsync({
+        invoiceId: invoiceId,
+        lines: linesToCreate, // rename to "lines"
+      })
+    );
+  };
+
+  // FUNCTION: Handle ALL invoice line operations - ALWAYS delete all then create all new
   const handleInvoiceLineChanges = async (
     invoiceId: string,
     newLines: any[]
   ) => {
     console.log("🔄 STARTING handleInvoiceLineChanges...");
-    console.log("📋 Existing invoice lines:", existingInvoiceLines);
-    console.log("🆕 New lines from form:", newLines);
+    console.log(
+      "📋 Existing invoice lines count:",
+      existingInvoiceLines.length
+    );
+    console.log("🆕 New lines from form count:", newLines.length);
     console.log("🆔 Invoice ID:", invoiceId);
 
-    const operations: (() => Promise<any>)[] = [];
-    let createCount = 0;
-    let updateCount = 0;
-    let deleteCount = 0;
+    // ALWAYS Step 1: Delete all existing lines (even if there are no new lines)
+    await deleteAllExistingLines(invoiceId);
 
-    // Find lines to CREATE (lines without IDs)
-    for (const newLine of newLines) {
-      if (!newLine.id) {
-        const cleanedLineData = cleanInvoiceLineData(newLine);
-        // Only create if there's actual data
-        if (Object.keys(cleanedLineData).length > 0) {
-          console.log("➕ CREATE NEEDED for new line:", cleanedLineData);
-          operations.push(() =>
-            createInvoiceLineMutation.mutateAsync({
-              invoiceId,
-              data: cleanedLineData,
-            })
-          );
-          createCount++;
-        }
-      }
-    }
-
-    // Find lines to UPDATE (lines that exist in both arrays but have changed)
-    for (const newLine of newLines) {
-      // Only check lines that have an ID (existing lines)
-      if (newLine.id) {
-        const existingLine = existingInvoiceLines.find(
-          (line) => line.id === newLine.id
-        );
-
-        if (existingLine) {
-          // Check if line has changed
-          const hasChanged =
-            existingLine.product !== newLine.product ||
-            existingLine.description !== newLine.description ||
-            existingLine.quantity !== newLine.quantity ||
-            existingLine.unit_price !== newLine.unit_price ||
-            existingLine.discount !== newLine.discount;
-
-          if (hasChanged) {
-            const cleanedLineData = cleanInvoiceLineData(newLine);
-            console.log(`📝 UPDATE NEEDED for line ${existingLine.id}`, {
-              from: {
-                product: existingLine.product,
-                description: existingLine.description,
-                quantity: existingLine.quantity,
-                unit_price: existingLine.unit_price,
-                discount: existingLine.discount,
-              },
-              to: cleanedLineData,
-            });
-
-            operations.push(() =>
-              updateInvoiceLineMutation.mutateAsync({
-                invoiceId,
-                lineId: existingLine.id,
-                data: cleanedLineData,
-              })
-            );
-            updateCount++;
-          } else {
-            console.log(`✅ Line ${existingLine.id} unchanged`);
-          }
-        } else {
-          console.log(
-            `❓ Line with ID ${newLine.id} not found in existing lines - treating as new line`
-          );
-          // This shouldn't normally happen, but if it does, create it
-          const cleanedLineData = cleanInvoiceLineData(newLine);
-          if (Object.keys(cleanedLineData).length > 0) {
-            operations.push(() =>
-              createInvoiceLineMutation.mutateAsync({
-                invoiceId,
-                data: cleanedLineData,
-              })
-            );
-            createCount++;
-          }
-        }
-      }
-    }
-
-    // Find lines to DELETE (lines that exist in existingInvoiceLines but not in newLines)
-    for (const existingLine of existingInvoiceLines) {
-      const lineStillExists = newLines.some(
-        (newLine) => newLine.id === existingLine.id
-      );
-
-      if (!lineStillExists) {
-        console.log(`🗑️ DELETE NEEDED for line ${existingLine.id}`);
-        operations.push(() =>
-          deleteInvoiceLineMutation.mutateAsync({
-            invoiceId,
-            lineId: existingLine.id,
-          })
-        );
-        deleteCount++;
-      }
-    }
-
-    console.log(
-      `🔄 Found ${operations.length} line operations to perform (${createCount} creates, ${updateCount} updates, ${deleteCount} deletes)`
-    );
-
-    // Execute all operations with batching and retry logic
-    if (operations.length > 0) {
-      try {
-        console.log("🚀 Executing line operations with batching...");
-        const results = await batchOperations(operations, 2, 200); // Batch size 2, 200ms delay
-        console.log("✅ All line operations completed successfully");
-
-        // Check for any failed operations
-        const failedOperations = results.filter(
-          (result) => result.status === "rejected"
-        );
-        if (failedOperations.length > 0) {
-          console.error("❌ Some operations failed:", failedOperations);
-          throw new Error(`${failedOperations.length} operations failed`);
-        }
-
-        return results;
-      } catch (error) {
-        console.error("❌ Error executing line operations:", error);
-        throw error;
-      }
+    // Step 2: Create all new lines in one batch (if there are any)
+    if (newLines.length > 0) {
+      await createAllNewLines(invoiceId, newLines);
     } else {
-      console.log("ℹ️ No line operations needed");
-      return [];
+      console.log("ℹ️ No new lines to create after deletion");
     }
+
+    console.log("✅ All line operations completed successfully");
   };
 
   const handleSubmit = async () => {
@@ -608,29 +519,18 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
           console.log("📦 Lines to process:", invoiceData.lines);
 
           if (existingInvoiceId) {
-            // Update existing invoice and handle ALL line operations
+            // Update existing invoice - ALWAYS handle line operations
             console.log(
               "📄 Updating existing invoice with ID:",
               existingInvoiceId
             );
-            console.log(
-              "📊 Existing lines count:",
-              existingInvoiceLines.length
-            );
 
-            // Handle ALL line operations (create, update, delete)
-            if (
-              invoiceData.lines.length > 0 ||
-              existingInvoiceLines.length > 0
-            ) {
-              console.log("🔄 Starting ALL line operations...");
-              await handleInvoiceLineChanges(
-                existingInvoiceId,
-                invoiceData.lines
-              );
-            } else {
-              console.log("⚠️ No lines to process");
-            }
+            // ALWAYS delete all existing lines and create new ones
+            console.log("🔄 Starting line operations...");
+            await handleInvoiceLineChanges(
+              existingInvoiceId,
+              invoiceData.lines
+            );
 
             // Update the main invoice data (without lines)
             console.log("📦 Updating main invoice data...");
@@ -670,7 +570,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
           console.log("  - TVA:", invoiceApiData.tva + "%");
           if (existingInvoiceId) {
             console.log(
-              "  - Line operations: Individual CREATE/UPDATE/DELETE operations"
+              "  - Line operations: DELETE ALL existing + CREATE ALL new in one batch"
             );
           } else {
             console.log("  - Line operations: All lines created with invoice");

@@ -45,39 +45,35 @@ export const fetchInvoice = async (id: string) => {
   return response;
 };
 
-export const createInvoiceLine = async (
-  invoiceId: string,
-  {
-    product,
-    description,
-    quantity,
-    unit_price,
-    discount,
-  }: {
-    product: string;
-    description?: string;
-    quantity: number;
-    unit_price: number;
-    discount?: number;
-  }
+export const createInvoiceLines = async ({ invoiceId, lines }) => {
+  const token = localStorage.getItem("access_token");
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+  console.log("the lines are", lines);
+
+  // IMPORTANT: send raw array not { data }
+  const response = await client.post(
+    `invoices/${invoiceId}/add-lines/`,
+    lines, // <-- send array directly
+    { headers }
+  );
+
+  return response.data;
+};
+export const updateInvoiceStatus = async (
+  id: string,
+  { action }: { action: "issue" | "mark_paid" | "revert_to_draft" }
 ) => {
   const token = localStorage.getItem("access_token");
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
   const response = await client.post(
-    `invoices/${invoiceId}/lines/`,
-    {
-      product,
-      description,
-      quantity,
-      unit_price,
-      discount,
-    },
+    `invoices/${id}/update-status/`,
+    { action },
     { headers }
   );
   return response;
 };
-
 export const updateInvoiceLine = async (
   invoiceId: string,
   lineId: string,

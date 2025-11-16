@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { useEmployers, useDeleteEmployer } from "@/hooks/useEmployers";
-import { Plus, Search, Edit, Trash2, Filter } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Filter, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -30,13 +31,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EmployerForm } from "@/components/EmployerForm";
+import { Badge } from "@/components/ui/badge";
 
 export const Employers: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedGroup, setSelectedGroup] = useState<string>("");
+  const [selectedGroup, setSelectedGroup] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingEmployer, setEditingEmployer] = useState<any>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Only pass group to API if it's not empty and not "all"
   const apiGroup =
@@ -82,8 +85,10 @@ export const Employers: React.FC = () => {
     setEditingEmployer(null);
   };
 
-  const handleGroupChange = (value: string) => {
-    setSelectedGroup(value);
+  const handleFilterChange = (key: string, value: string) => {
+    if (key === "group") {
+      setSelectedGroup(value);
+    }
     setCurrentPage(1); // Reset to first page when filter changes
   };
 
@@ -94,7 +99,7 @@ export const Employers: React.FC = () => {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setSelectedGroup("");
+    setSelectedGroup("all");
     setCurrentPage(1);
   };
 
@@ -114,6 +119,8 @@ export const Employers: React.FC = () => {
 
     return [...new Set(groups)].sort();
   }, [allEmployersData]);
+
+  const hasActiveFilters = searchTerm !== "" || selectedGroup !== "all";
 
   if (error) {
     return (
@@ -135,91 +142,77 @@ export const Employers: React.FC = () => {
         </Button>
       </div>
 
-      {/* Filters Section */}
-      <div className="bg-white p-4 rounded-lg shadow space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-700 flex items-center">
-            <Filter className="w-5 h-5 mr-2" />
-            Filtres
-          </h2>
-          {(searchTerm || selectedGroup) && (
-            <Button variant="outline" size="sm" onClick={clearFilters}>
-              Effacer les filtres
-            </Button>
+      {/* Search and Filters */}
+      <div className="flex items-center space-x-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input
+            type="text"
+            placeholder="Rechercher un employé..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="pl-10"
+          />
+        </div>
+
+        <Button
+          variant="outline"
+          onClick={() => setShowFilters(!showFilters)}
+          className="flex items-center space-x-2"
+        >
+          <Filter className="w-4 h-4" />
+          <span>Filtres</span>
+          {hasActiveFilters && (
+            <Badge variant="secondary" className="ml-1">
+              {(searchTerm ? 1 : 0) + (selectedGroup !== "all" ? 1 : 0)}
+            </Badge>
           )}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              type="text"
-              placeholder="Rechercher un employé..."
-              value={searchTerm}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-
-          {/* Group Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Filtrer par groupe
-            </label>
-            <Select value={selectedGroup} onValueChange={handleGroupChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Tous les groupes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les groupes</SelectItem>
-                {availableGroups.map((group) => (
-                  <SelectItem key={group} value={group}>
-                    {group}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Active Filters Display */}
-          <div className="flex items-end">
-            {(searchTerm || (selectedGroup && selectedGroup !== "all")) && (
-              <div className="text-sm text-gray-600">
-                Filtres actifs:
-                {searchTerm && (
-                  <span className="ml-2 bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
-                    Recherche: "{searchTerm}"
-                  </span>
-                )}
-                {selectedGroup && selectedGroup !== "all" && (
-                  <span className="ml-2 bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
-                    Groupe: {selectedGroup}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        </Button>
       </div>
+
+      {/* Filters Panel */}
+      {showFilters && (
+        <div className="bg-gray-50 p-4 rounded-lg border">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold">Filtres</h3>
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              <X className="w-4 h-4 mr-1" />
+              Effacer
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Group Filter */}
+            <div>
+              <Label>Groupe</Label>
+              <Select
+                value={selectedGroup}
+                onValueChange={(value) => handleFilterChange("group", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Tous les groupes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les groupes</SelectItem>
+                  {availableGroups.map((group) => (
+                    <SelectItem key={group} value={group}>
+                      {group}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Results Count */}
       {employersData && (
         <div className="text-sm text-gray-600">
-          {employersData.count === 0 ? (
-            "Aucun employé trouvé"
-          ) : (
-            <>
-              {searchTerm || (selectedGroup && selectedGroup !== "all")
-                ? "Résultats de la recherche: "
-                : "Total: "}
-              <strong>{employersData.count}</strong> employé(s)
-              {selectedGroup &&
-                selectedGroup !== "all" &&
-                ` dans le groupe "${selectedGroup}"`}
-              {searchTerm && ` pour "${searchTerm}"`}
-            </>
-          )}
+          {employersData.count === 0 && "Aucun employé trouvé"}
         </div>
       )}
 
@@ -228,26 +221,51 @@ export const Employers: React.FC = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nom d'utilisateur</TableHead>
-              <TableHead>Nom complet</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Téléphone</TableHead>
-              <TableHead>Groupe</TableHead>
-              <TableHead>Wilaya</TableHead>
-              <TableHead>Actions</TableHead>
+              <TableHead className="text-left">Nom d'utilisateur</TableHead>
+              <TableHead className="text-left">Nom complet</TableHead>
+              <TableHead className="text-left">Email</TableHead>
+              <TableHead className="text-left">Téléphone</TableHead>
+              <TableHead className="text-left">Groupe</TableHead>
+              <TableHead className="text-left">Wilaya</TableHead>
+              <TableHead className="text-left w-[150px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-4">
-                  Chargement...
-                </TableCell>
-              </TableRow>
+              <>
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <TableRow key={index} className="animate-pulse">
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-6 bg-gray-200 rounded w-20"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-16"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="flex justify-start space-x-2">
+                        <div className="h-8 w-8 bg-gray-200 rounded"></div>
+                        <div className="h-8 w-8 bg-gray-200 rounded"></div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </>
             ) : employersData?.results?.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-4">
-                  {searchTerm || (selectedGroup && selectedGroup !== "all")
+                  {hasActiveFilters
                     ? "Aucun employé ne correspond aux critères de recherche"
                     : "Aucun employé trouvé"}
                 </TableCell>
@@ -255,17 +273,21 @@ export const Employers: React.FC = () => {
             ) : (
               employersData?.results?.map((employer: any) => (
                 <TableRow key={employer.id}>
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium text-left">
                     {employer.username}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-left">
                     {employer.first_name && employer.last_name
                       ? `${employer.first_name} ${employer.last_name}`
                       : "-"}
                   </TableCell>
-                  <TableCell>{employer.email || "-"}</TableCell>
-                  <TableCell>{employer.phone_number || "-"}</TableCell>
-                  <TableCell>
+                  <TableCell className="text-left">
+                    {employer.email || "-"}
+                  </TableCell>
+                  <TableCell className="text-left">
+                    {employer.phone_number || "-"}
+                  </TableCell>
+                  <TableCell className="text-left">
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-medium ${
                         employer.group
@@ -276,19 +298,26 @@ export const Employers: React.FC = () => {
                       {employer.group || "Non assigné"}
                     </span>
                   </TableCell>
-                  <TableCell>{employer.wilaya || "-"}</TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
+                  <TableCell className="text-left">
+                    {employer.wilaya || "-"}
+                  </TableCell>
+                  <TableCell className="text-left">
+                    <div className="flex items-center justify-start space-x-2 min-h-[40px]">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleEdit(employer)}
+                        className="flex items-center justify-center w-8 h-8 p-0"
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="sm">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center justify-center w-8 h-8 p-0"
+                          >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </AlertDialogTrigger>

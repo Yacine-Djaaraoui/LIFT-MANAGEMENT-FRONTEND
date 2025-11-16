@@ -32,7 +32,7 @@ export const Login: React.FC = () => {
       onSuccess: (response) => {
         localStorage.setItem("access_token", response.access);
         localStorage.setItem("refresh_token", response.refresh);
-        navigate("/dashboard");
+        navigate("/statistics");
       },
       onError: (err: any) => {
         console.error("Login error:", err);
@@ -60,7 +60,7 @@ export const Login: React.FC = () => {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-800">Lift Management</h1>
+          <h1 className="text-2xl font-bold text-gray-800">EURL KR7 FIBRE</h1>
           <p className="text-gray-600 mt-2">Connectez-vous à votre compte</p>
         </div>
 

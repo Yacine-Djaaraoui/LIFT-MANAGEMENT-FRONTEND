@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
@@ -14,6 +14,69 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Search } from "lucide-react";
+
+// Algerian wilayas (provinces) - same list as in calendar
+const ALGERIAN_WILAYAS = [
+  "Adrar",
+  "Chlef",
+  "Laghouat",
+  "Oum El Bouaghi",
+  "Batna",
+  "Béjaïa",
+  "Biskra",
+  "Béchar",
+  "Blida",
+  "Bouira",
+  "Tamanrasset",
+  "Tébessa",
+  "Tlemcen",
+  "Tiaret",
+  "Tizi Ouzou",
+  "Alger",
+  "Djelfa",
+  "Jijel",
+  "Sétif",
+  "Saïda",
+  "Skikda",
+  "Sidi Bel Abbès",
+  "Annaba",
+  "Guelma",
+  "Constantine",
+  "Médéa",
+  "Mostaganem",
+  "M'Sila",
+  "Mascara",
+  "Ouargla",
+  "Oran",
+  "El Bayadh",
+  "Illizi",
+  "Bordj Bou Arréridj",
+  "Boumerdès",
+  "El Tarf",
+  "Tindouf",
+  "Tissemsilt",
+  "El Oued",
+  "Khenchela",
+  "Souk Ahras",
+  "Tipaza",
+  "Mila",
+  "Aïn Defla",
+  "Naâma",
+  "Aïn Témouchent",
+  "Ghardaïa",
+  "Relizane",
+  "Timimoun",
+  "Bordj Badji Mokhtar",
+  "Ouled Djellal",
+  "Béni Abbès",
+  "In Salah",
+  "In Guezzam",
+  "Touggourt",
+  "Djanet",
+  "El M'Ghair",
+  "El Menia",
+];
 
 // Make optional fields truly optional with proper transformation
 const clientSchema = yup.object({
@@ -100,15 +163,19 @@ interface ClientFormProps {
   open: boolean;
   onClose: () => void;
   client?: any;
+  onSuccess?: (client: any) => void; // New prop for success callback
 }
 
 export const ClientForm: React.FC<ClientFormProps> = ({
   open,
   onClose,
   client,
+  onSuccess,
 }) => {
   const createMutation = useCreateClient();
   const updateMutation = useUpdateClient();
+  const [wilayaSearch, setWilayaSearch] = useState("");
+  const [showWilayaDropdown, setShowWilayaDropdown] = useState(false);
 
   const {
     register,
@@ -142,6 +209,12 @@ export const ClientForm: React.FC<ClientFormProps> = ({
   });
 
   const isCorporate = watch("is_corporate");
+  const selectedCity = watch("address.city");
+
+  // Filter wilayas based on search
+  const filteredWilayas = ALGERIAN_WILAYAS.filter((wilaya) =>
+    wilaya.toLowerCase().includes(wilayaSearch.toLowerCase())
+  );
 
   // Reset form with client data when client changes or dialog opens
   useEffect(() => {
@@ -196,6 +269,17 @@ export const ClientForm: React.FC<ClientFormProps> = ({
     setValue("is_corporate", checked, { shouldValidate: true });
   };
 
+  const selectWilaya = (wilaya: string) => {
+    setValue("address.city", wilaya, { shouldValidate: true });
+    setShowWilayaDropdown(false);
+    setWilayaSearch("");
+  };
+
+  const clearWilaya = () => {
+    setValue("address.city", "", { shouldValidate: true });
+    setWilayaSearch("");
+  };
+
   const onSubmit = async (data: ClientFormData) => {
     try {
       console.log("Form data submitted:", data); // Debug log
@@ -228,15 +312,22 @@ export const ClientForm: React.FC<ClientFormProps> = ({
 
       console.log("API data to send:", apiData); // Debug log
 
+      let result;
       if (client) {
-        await updateMutation.mutateAsync({
+        result = await updateMutation.mutateAsync({
           id: client.id,
           data: apiData,
         });
       } else {
-        await createMutation.mutateAsync(apiData);
+        result = await createMutation.mutateAsync(apiData);
       }
+
       handleClose();
+
+      // Call onSuccess callback if provided
+      if (onSuccess && result) {
+        onSuccess(result);
+      }
     } catch (error) {
       console.error("Error saving client:", error);
     }
@@ -244,6 +335,8 @@ export const ClientForm: React.FC<ClientFormProps> = ({
 
   const handleClose = () => {
     reset();
+    setWilayaSearch("");
+    setShowWilayaDropdown(false);
     onClose();
   };
 
@@ -261,51 +354,6 @@ export const ClientForm: React.FC<ClientFormProps> = ({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Current Values Display (for update) */}
-          {/* {client && (
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <h4 className="font-medium text-blue-800 mb-2">
-                Valeurs Actuelles
-              </h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <span className="text-blue-600">Type:</span>
-                  <div className="font-medium">
-                    {client.is_corporate ? "Entreprise" : "Particulier"}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-blue-600">Téléphone:</span>
-                  <div className="font-medium">{client.phone_number}</div>
-                </div>
-                {client.email && (
-                  <div>
-                    <span className="text-blue-600">Email:</span>
-                    <div className="font-medium">{client.email}</div>
-                  </div>
-                )}
-                {client.fax && (
-                  <div>
-                    <span className="text-blue-600">Fax:</span>
-                    <div className="font-medium">{client.fax}</div>
-                  </div>
-                )}
-                {client.nif && (
-                  <div>
-                    <span className="text-blue-600">NIF:</span>
-                    <div className="font-medium">{client.nif}</div>
-                  </div>
-                )}
-                {client.address?.city && (
-                  <div>
-                    <span className="text-blue-600">Ville:</span>
-                    <div className="font-medium">{client.address.city}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )} */}
-
           {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Informations de Base</h3>
@@ -443,7 +491,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
           {/* Address Information */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium">
-              Adresse <span className="text-gray-500">(Optionnel)</span>
+              Adresse 
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -456,13 +504,66 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                 />
               </div>
 
-              <div>
-                <Label htmlFor="address.city">Ville</Label>
-                <Input
-                  id="address.city"
-                  {...register("address.city")}
-                  placeholder="Ville"
-                />
+              <div className="relative">
+                <Label htmlFor="address.city">Wilaya</Label>
+                <div className="relative">
+                  <Input
+                    id="address.city"
+                    value={selectedCity || ""}
+                    placeholder="Sélectionner une wilaya"
+                    readOnly
+                    onFocus={() => setShowWilayaDropdown(true)}
+                  />
+                  {selectedCity && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearWilaya}
+                      className="absolute right-8 top-0 h-full px-2"
+                    >
+                      ×
+                    </Button>
+                  )}
+                  <Search className="absolute right-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                </div>
+
+                {showWilayaDropdown && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+                    {/* Search input inside dropdown */}
+                    <div className="p-2 border-b">
+                      <Input
+                        placeholder="Rechercher une wilaya..."
+                        value={wilayaSearch}
+                        onChange={(e) => setWilayaSearch(e.target.value)}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Wilayas list */}
+                    <div className="max-h-48 overflow-y-auto">
+                      {filteredWilayas.length > 0 ? (
+                        filteredWilayas.map((wilaya) => (
+                          <div
+                            key={wilaya}
+                            className={`p-2 cursor-pointer hover:bg-gray-100 ${
+                              selectedCity === wilaya
+                                ? "bg-blue-50 text-blue-600"
+                                : ""
+                            }`}
+                            onClick={() => selectWilaya(wilaya)}
+                          >
+                            {wilaya}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-2 text-sm text-gray-500 text-center">
+                          Aucune wilaya trouvée
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="md:col-span-2">
@@ -498,8 +599,6 @@ export const ClientForm: React.FC<ClientFormProps> = ({
             />
           </div>
 
-          {/* Debug Information (Development only) */}
-
           {/* Form Information */}
           <div className="bg-gray-50 p-3 rounded-lg">
             <p className="text-sm text-gray-600">
@@ -521,6 +620,14 @@ export const ClientForm: React.FC<ClientFormProps> = ({
             </Button>
           </div>
         </form>
+
+        {/* Close dropdown when clicking outside */}
+        {showWilayaDropdown && (
+          <div
+            className="fixed inset-0 z-0"
+            onClick={() => setShowWilayaDropdown(false)}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

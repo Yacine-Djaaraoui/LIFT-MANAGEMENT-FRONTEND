@@ -89,7 +89,10 @@ export const Assistants: React.FC = () => {
             type="text"
             placeholder="Rechercher un assistant..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
             className="pl-10"
           />
         </div>
@@ -99,22 +102,47 @@ export const Assistants: React.FC = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nom d'utilisateur</TableHead>
-              <TableHead>Nom complet</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Téléphone</TableHead>
-              <TableHead>Wilaya</TableHead>
-              <TableHead>Date de création</TableHead>
-              <TableHead>Actions</TableHead>
+              <TableHead className="text-left">Nom d'utilisateur</TableHead>
+              <TableHead className="text-left">Nom complet</TableHead>
+              <TableHead className="text-left">Email</TableHead>
+              <TableHead className="text-left">Téléphone</TableHead>
+              <TableHead className="text-left">Wilaya</TableHead>
+              {/* <TableHead className="text-left">Date de création</TableHead> */}
+              <TableHead className="text-left w-[150px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-4">
-                  Chargement...
-                </TableCell>
-              </TableRow>
+              <>
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <TableRow key={index} className="animate-pulse">
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-16"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="flex justify-start space-x-2">
+                        <div className="h-8 w-8 bg-gray-200 rounded"></div>
+                        <div className="h-8 w-8 bg-gray-200 rounded"></div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </>
             ) : assistantsData?.results?.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-4">
@@ -124,32 +152,43 @@ export const Assistants: React.FC = () => {
             ) : (
               assistantsData?.results?.map((assistant: any) => (
                 <TableRow key={assistant.id}>
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium text-left">
                     {assistant.username}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-left">
                     {assistant.first_name && assistant.last_name
                       ? `${assistant.first_name} ${assistant.last_name}`
                       : "-"}
                   </TableCell>
-                  <TableCell>{assistant.email || "-"}</TableCell>
-                  <TableCell>{assistant.phone_number || "-"}</TableCell>
-                  <TableCell>{assistant.wilaya || "-"}</TableCell>
-                  <TableCell>
-                    {new Date(assistant.created_at).toLocaleDateString("fr-FR")}
+                  <TableCell className="text-left">
+                    {assistant.email || "-"}
                   </TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
+                  <TableCell className="text-left">
+                    {assistant.phone_number || "-"}
+                  </TableCell>
+                  <TableCell className="text-left">
+                    {assistant.wilaya || "-"}
+                  </TableCell>
+                  {/* <TableCell className="text-left">
+                    {new Date(assistant.created_at).toLocaleDateString("fr-FR")}
+                  </TableCell> */}
+                  <TableCell className="text-left">
+                    <div className="flex items-center justify-start space-x-2 min-h-[40px]">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleEdit(assistant)}
+                        className="flex items-center justify-center w-8 h-8 p-0"
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="sm">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center justify-center w-8 h-8 p-0"
+                          >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </AlertDialogTrigger>

@@ -13,6 +13,7 @@ export const fetchProjects = async ({
   client,
   is_verified,
   status,
+  city, // <-- NOW city is an array of strings
 }: {
   ordering?: string;
   search?: string;
@@ -21,9 +22,11 @@ export const fetchProjects = async ({
   client?: string;
   is_verified?: boolean;
   status?: string;
+  city?: string[]; // <--- FIXED
 }) => {
   const token = localStorage.getItem("access_token");
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
   const params = new URLSearchParams();
 
   if (ordering) params.append("ordering", ordering);
@@ -31,15 +34,23 @@ export const fetchProjects = async ({
   if (page_size) params.append("page_size", page_size);
   if (page) params.append("page", page);
   if (client) params.append("client", client);
+
+  if (city && Array.isArray(city)) {
+    city.forEach((c) => params.append("city", c)); // <---- FIXED
+  }
+
   if (is_verified !== undefined)
     params.append("is_verified", String(is_verified));
+
   if (status) params.append("status", status);
 
   const response = await httpclient.get(`projects/?${params.toString()}`, {
     headers,
   });
+
   return response;
 };
+
 
 export const fetchProject = async (id: string) => {
   const token = localStorage.getItem("access_token");
@@ -165,6 +176,17 @@ export const verifyProject = async (id: string) => {
 
   const response = await httpclient.post(
     `projects/${id}/verify/`,
+    {},
+    { headers }
+  );
+  return response;
+};
+export const UnverifyProject = async (id: string) => {
+  const token = localStorage.getItem("access_token");
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+  const response = await httpclient.post(
+    `projects/${id}/unverify/`,
     {},
     { headers }
   );
