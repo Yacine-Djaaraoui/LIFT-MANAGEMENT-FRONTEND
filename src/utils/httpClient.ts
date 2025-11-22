@@ -92,7 +92,7 @@ function ApiClient(config: ApiClientConfig = {}): AxiosInstance {
     async (error: AxiosError) => {
       if (error?.response) {
         const statusCode = error.response?.status;
-        const message = error?.response?.data?.detail;
+        const message = error?.response?.message;
         const originalRequest = error.config;
 
         if (statusCode === 401) {
@@ -122,10 +122,10 @@ function ApiClient(config: ApiClientConfig = {}): AxiosInstance {
             }
           } else {
             if (message) return Promise.reject(message);
-            else return Promise.reject(error?.response?.data);
+            else return Promise.reject(error?.response);
           }
         } else if (statusCode >= 500) {
-          return Promise.reject(translations.serverError);
+          return Promise.reject({ message: "Erreur de serveur" });
         } else if (statusCode == 404) {
           return Promise.reject("ForBidden Request");
         } else {

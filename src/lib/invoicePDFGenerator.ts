@@ -1,5 +1,6 @@
 // invoicePDFGenerator.ts
 import jsPDF from "jspdf";
+import logo from "@/assets/kr7 logo-1.png";
 
 interface InvoiceData {
   invoice: {
@@ -58,6 +59,18 @@ const COMPANY_INFO = {
   nis: "002225060005269",
   ai: "25068222182",
   activity: "Installation Fibre Optique et Réseaux",
+};
+
+// Brand colors
+const COLORS = {
+  primary: [41, 128, 185], // Blue #2980b9
+  primaryLight: [52, 152, 219], // Light Blue #3498db
+  accent: [46, 134, 222], // Accent Blue #2e86de
+  darkText: [44, 62, 80], // Dark text #2c3e50
+  lightGray: [236, 240, 241], // Light gray #ecf0f1
+  white: [255, 255, 255],
+  success: [39, 174, 96], // Green
+  danger: [231, 76, 60], // Red
 };
 
 // Number to French words converter
@@ -249,7 +262,7 @@ export const generateInvoicePDF = (
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 20;
-  let currentY = 20;
+  let currentY = 15;
 
   // Set document properties based on type
   let title = "";
@@ -259,6 +272,7 @@ export const generateInvoicePDF = (
     case "bon_de_commande":
       title = "BON DE COMMANDE";
       documentNumber =
+        invoiceData.invoice.bon_de_commande ||
         invoiceData.invoice.facture ||
         `BC-${projectId || "TEMP"}-${Date.now().toString().slice(-6)}`;
       break;
@@ -271,18 +285,21 @@ export const generateInvoicePDF = (
     case "facture_proforma":
       title = "FACTURE PROFORMA";
       documentNumber =
+        invoiceData.invoice.facture_proforma ||
         invoiceData.invoice.facture ||
         `FP-${projectId || "TEMP"}-${Date.now().toString().slice(-6)}`;
       break;
     case "bon_de_versement":
       title = "BON DE VERSEMENT";
       documentNumber =
+        invoiceData.invoice.bon_de_versement ||
         invoiceData.invoice.facture ||
         `BV-${projectId || "TEMP"}-${Date.now().toString().slice(-6)}`;
       break;
     case "bon_de_livraison":
       title = "BON DE LIVRAISON";
       documentNumber =
+        invoiceData.invoice.bon_de_livraison ||
         invoiceData.invoice.facture ||
         `BL-${projectId || "TEMP"}-${Date.now().toString().slice(-6)}`;
       break;
@@ -293,110 +310,195 @@ export const generateInvoicePDF = (
         .slice(-6)}`;
   }
 
-  // For bon_de_commande, show client header instead of company header
+  // Header background with blue color
+  doc.setFillColor(...COLORS.primary);
+  doc.rect(0, 0, pageWidth, 45, "F");
+  doc.setFillColor(...COLORS.white);
+
+  // For bon_de_commande, show CLIENT at the top with all details
   if (type === "bon_de_commande") {
-    // Client header for bon de commande
+    // Client header for bon de commande - FULL DETAILS AT TOP
+    doc.setTextColor(...COLORS.white);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text(client.name, margin, currentY);
-    currentY += 6;
-
-    doc.setFontSize(9);
+    doc.text(client.name, margin, 8);
+    doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
 
-    // Client header information - only add non-empty lines
     const clientHeaderLines: string[] = [];
-
     const formattedAddress = formatClientAddress(client.address);
     if (formattedAddress) clientHeaderLines.push(formattedAddress);
     if (client.rc) clientHeaderLines.push(`RC: ${client.rc}`);
     if (client.nif) clientHeaderLines.push(`NIF: ${client.nif}`);
     if (client.ai) clientHeaderLines.push(`AI: ${client.ai}`);
     if (client.nis) clientHeaderLines.push(`NIS: ${client.nis}`);
+    if (client.art) clientHeaderLines.push(`ART: ${client.art}`);
+    if (client.account_number)
+      clientHeaderLines.push(`Compte: ${client.account_number}`);
     if (client.phone_number)
       clientHeaderLines.push(`Tél: ${client.phone_number}`);
     if (client.email) clientHeaderLines.push(`Email: ${client.email}`);
+    if (client.fax) clientHeaderLines.push(`Fax: ${client.fax}`);
+    // if (client.is_corporate !== undefined) {
+    //   clientHeaderLines.push(
+    //     `Type: ${client.is_corporate ? "Entreprise" : "Particulier"}`
+    //   );
+    // }
 
+    let headerY = 12;
     clientHeaderLines.forEach((line) => {
       if (line && line.trim()) {
-        doc.text(line, margin, currentY);
-        currentY += 3.5;
+        doc.text(line, margin, headerY);
+        headerY += 3.5;
+      }
+    });
+
+    // No logo for bon de commande since client info takes the full header
+  } else {
+    // Company header for other document types
+    // Add company logo
+    doc.addImage(logo, "PNG", margin, 8, 35, 35);
+    doc.setDrawColor(...COLORS.primaryLight);
+    doc.setLineWidth(0.5);
+    doc.rect(margin, 8, 35, 35, "S");
+    doc.setDrawColor(...COLORS.primaryLight);
+
+    doc.setTextColor(...COLORS.white);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text(COMPANY_INFO.name, margin + 40, 18);
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${COMPANY_INFO.address}, ${COMPANY_INFO.city}`, margin + 40, 24);
+    doc.text(`${COMPANY_INFO.phone} | ${COMPANY_INFO.email}`, margin + 40, 28);
+    doc.text(
+      `RC: ${COMPANY_INFO.rc} | NIF: ${COMPANY_INFO.nif} | AI: ${COMPANY_INFO.ai} | NIS: ${COMPANY_INFO.nis}`,
+      margin + 40,
+      32
+    );
+    // doc.text(`Activité principale: ${COMPANY_INFO.activity}`, margin + 40, 36);
+  }
+
+  currentY = 55;
+
+  // Document title in blue box
+  doc.setFillColor(...COLORS.primaryLight);
+  doc.roundedRect(margin, currentY, pageWidth - 2 * margin, 12, 2, 2, "F");
+  doc.setTextColor(...COLORS.white);
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text(title, pageWidth / 2, currentY + 8, { align: "center" });
+
+  // For Facture Proforma, add special notice
+  if (type === "facture_proforma") {
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(100, 100, 100);
+    // doc.text(
+    //   "Document préliminaire - Sans valeur comptable",
+    //   pageWidth / 2,
+    //   currentY + 20,
+    //   { align: "center" }
+    // );
+    doc.setTextColor(...COLORS.white);
+  }
+
+  currentY += type === "facture_proforma" ? 25 : 20;
+
+  // Document info box on the right
+  const infoBoxWidth = 60;
+  const infoBoxX = pageWidth - margin - infoBoxWidth;
+  doc.setFillColor(...COLORS.lightGray);
+  const infoBoxHeight = type === "facture_proforma" ? 21 : 16;
+  doc.roundedRect(infoBoxX, currentY, infoBoxWidth, infoBoxHeight, 2, 2, "F");
+
+  doc.setTextColor(...COLORS.darkText);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+
+  if (type === "bon_de_commande") {
+    doc.text("Commande N°", infoBoxX + 3, currentY + 6);
+  } else {
+    doc.text("Facture N°", infoBoxX + 3, currentY + 6);
+  }
+
+  doc.text("Date", infoBoxX + 3, currentY + 12);
+
+  // For proforma, add validity period
+  // if (type === "facture_proforma") {
+  //   doc.text("Validité", infoBoxX + 3, currentY + 18);
+  // }
+
+  doc.setFont("helvetica", "normal");
+  const dueDate =
+    type === "facture" && invoiceData.invoice.due_date
+      ? new Date(invoiceData.invoice.due_date).toLocaleDateString("fr-FR")
+      : new Date().toLocaleDateString("fr-FR");
+
+  doc.text(documentNumber, infoBoxX + infoBoxWidth - 3, currentY + 6, {
+    align: "right",
+  });
+  doc.text(dueDate, infoBoxX + infoBoxWidth - 3, currentY + 12, {
+    align: "right",
+  });
+
+  if (type === "facture_proforma") {
+    doc.text("30 jours", infoBoxX + infoBoxWidth - 3, currentY + 18, {
+      align: "right",
+    });
+  }
+
+  // Recipient section on the left - SWITCHED FOR BON DE COMMANDE
+  const recipientBoxWidth = pageWidth - 2 * margin - infoBoxWidth - 5;
+
+  if (type !== "bon_de_commande") {
+    // For other documents: Show "Facturé À" with client details
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...COLORS.darkText);
+    doc.text("Facturé À", margin, currentY + 6);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+
+    const recipientLines: string[] = [client.name];
+    if (client.email) recipientLines.push(`Email: ${client.email}`);
+    if (client.phone_number) recipientLines.push(`Tél: ${client.phone_number}`);
+    const formattedAddress = formatClientAddress(client.address);
+    if (formattedAddress) recipientLines.push(`Adresse: ${formattedAddress}`);
+    if (client.rc) recipientLines.push(`RC: ${client.rc}`);
+    if (client.nif) recipientLines.push(`NIF: ${client.nif}`);
+    if (client.nis) recipientLines.push(`NIS: ${client.nis}`);
+    if (client.ai) recipientLines.push(`AI: ${client.ai}`);
+    if (client.art) recipientLines.push(`ART: ${client.art}`);
+    if (client.account_number)
+      recipientLines.push(`Compte: ${client.account_number}`);
+    if (client.fax) recipientLines.push(`Fax: ${client.fax}`);
+    if (client.is_corporate !== undefined) {
+      recipientLines.push(
+        `Type: ${client.is_corporate ? "Entreprise" : "Particulier"}`
+      );
+    }
+
+    let recipientY = currentY + 12;
+    recipientLines.slice(0, 5).forEach((line) => {
+      if (line && line.trim()) {
+        doc.text(line, margin, recipientY);
+        recipientY += 4;
       }
     });
   } else {
-    // Company header for other document types
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text(COMPANY_INFO.name, margin, currentY);
-    currentY += 6;
-
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-
-    // Company address and info
-    const companyLines = [
-      COMPANY_INFO.address + ", " + COMPANY_INFO.city,
-      `RC: ${COMPANY_INFO.rc}`,
-      `NIF: ${COMPANY_INFO.nif}`,
-      `AI: ${COMPANY_INFO.ai}`,
-      `NIS: ${COMPANY_INFO.nis}`,
-      `Activité principale: ${COMPANY_INFO.activity}`,
-    ];
-
-    companyLines.forEach((line) => {
-      doc.text(line, margin, currentY);
-      currentY += 3.5;
-    });
-  }
-
-  // Separator line
-  currentY += 6;
-  doc.setDrawColor(0);
-  doc.setLineWidth(0.5);
-  doc.line(margin, currentY, pageWidth - margin, currentY);
-  currentY += 8;
-
-  // Document title
-  doc.setFontSize(16);
-  doc.setFont("helvetica", "bold");
-  doc.text(title, pageWidth / 2, currentY, { align: "center" });
-  currentY += 10;
-
-  // For Facture Proforma, add special notice
-  // if (type === "facture_proforma") {
-  //   doc.setFontSize(8);
-  //   doc.setFont("helvetica", "italic");
-  //   doc.setTextColor(100, 100, 100);
-  //   doc.text(
-  //     "Document préliminaire - Sans valeur comptable",
-  //     pageWidth / 2,
-  //     currentY,
-  //     { align: "center" }
-  //   );
-  //   doc.setTextColor(0, 0, 0);
-  //   currentY += 8;
-  // }
-
-  // Two-column layout for recipient and document info
-  const leftColumn = margin;
-  const rightColumn = pageWidth - 60;
-
-  // Only show "Destinataire" title for non-bon_de_commande documents
-  if (type !== "bon_de_commande") {
+    // For bon de commande: Show company as recipient since client is already at top
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text("Destinataire", leftColumn, currentY);
-    currentY += 5;
-  }
+    doc.setTextColor(...COLORS.darkText);
+    doc.text("Destinataire", margin, currentY + 6);
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
 
-  let recipientLines: string[] = [];
-
-  if (type === "bon_de_commande") {
-    // Show company as recipient for bon de commande
-    recipientLines = [
+    const companyRecipientLines = [
       COMPANY_INFO.name,
       COMPANY_INFO.address + ", " + COMPANY_INFO.city,
       `Tél: ${COMPANY_INFO.phone}`,
@@ -406,86 +508,22 @@ export const generateInvoicePDF = (
       `AI: ${COMPANY_INFO.ai}`,
       `NIS: ${COMPANY_INFO.nis}`,
     ];
-  } else {
-    // Show client as recipient for other documents
-    recipientLines = [client.name];
 
-    if (client.email) recipientLines.push(`Email: ${client.email}`);
-    if (client.phone_number) recipientLines.push(`Tél: ${client.phone_number}`);
-
-    const formattedAddress = formatClientAddress(client.address);
-    if (formattedAddress) recipientLines.push(`Adresse: ${formattedAddress}`);
-
-    // Corporate information
-    if (client.rc) recipientLines.push(`RC: ${client.rc}`);
-    if (client.nif) recipientLines.push(`NIF: ${client.nif}`);
-    if (client.nis) recipientLines.push(`NIS: ${client.nis}`);
-    if (client.ai) recipientLines.push(`AI: ${client.ai}`);
-    if (client.art) recipientLines.push(`ART: ${client.art}`);
-    if (client.account_number)
-      recipientLines.push(`Compte: ${client.account_number}`);
-    if (client.fax) recipientLines.push(`Fax: ${client.fax}`);
-    // if (client.is_corporate !== undefined) {
-    //   recipientLines.push(
-    //     `Type: ${client.is_corporate ? "Entreprise" : "Particulier"}`
-    //   );
-    // }
+    let recipientY = currentY + 12;
+    companyRecipientLines.slice(0, 6).forEach((line) => {
+      if (line && line.trim()) {
+        doc.text(line, margin, recipientY);
+        recipientY += 4;
+      }
+    });
   }
-
-  let recipientInfoY = currentY;
-  recipientLines.forEach((line) => {
-    if (line && line.trim()) {
-      doc.text(line, leftColumn, recipientInfoY);
-      recipientInfoY += 3.5;
-    }
-  });
-
-  // Document information - Right column
-  let docInfoY = currentY;
-
-  // Date label and value
-  doc.setFont("helvetica", "bold");
-  const dateLabel = "Date:";
-  const dateLabelWidth = doc.getTextWidth(dateLabel);
-  doc.text(dateLabel, rightColumn - dateLabelWidth - 2, docInfoY);
-
-  doc.setFont("helvetica", "normal");
-  const dueDate =
-    type === "facture" && invoiceData.invoice.due_date
-      ? new Date(invoiceData.invoice.due_date).toLocaleDateString("fr-FR")
-      : new Date().toLocaleDateString("fr-FR");
-
-  doc.text(dueDate, rightColumn, docInfoY);
-  docInfoY += 5;
-
-  // Number label and value
-  doc.setFont("helvetica", "bold");
-  const numLabel = "Numéro:";
-  const numLabelWidth = doc.getTextWidth(numLabel);
-  doc.text(numLabel, rightColumn - numLabelWidth - 2, docInfoY);
-
-  doc.setFont("helvetica", "normal");
-  doc.text(documentNumber, rightColumn, docInfoY);
-
-  // For proforma, add validity period
-  // if (type === "facture_proforma") {
-  //   docInfoY += 5;
-  //   doc.setFont("helvetica", "bold");
-  //   const validLabel = "Validité:";
-  //   const validLabelWidth = doc.getTextWidth(validLabel);
-  //   doc.text(validLabel, rightColumn - validLabelWidth - 2, docInfoY);
-  //   doc.setFont("helvetica", "normal");
-  //   doc.text("30 jours", rightColumn, docInfoY);
-  // }
-
-  currentY = Math.max(recipientInfoY, docInfoY) + 8;
-
-  // Separator line before table
-  doc.setDrawColor(0);
-  doc.setLineWidth(0.5);
-  doc.line(margin, currentY, pageWidth - margin, currentY);
-  currentY += 6;
-
+  // Calculate proper Y position to avoid overlap
+  const recipientBottomY = currentY + infoBoxHeight + 20; // Add more space after recipient section
+  currentY = Math.max(
+    recipientBottomY,
+    currentY + (type === "facture_proforma" ? 30 : 25)
+  );
+  // [Rest of the code remains exactly the same as previous version...]
   // Check if we need to show discount column
   const hasDiscount = invoiceData.lines.some((line) => line.discount > 0);
 
@@ -528,41 +566,45 @@ export const generateInvoicePDF = (
 
   // Table for invoice lines
   if (invoiceData.lines.length > 0 && type !== "bon_de_versement") {
-    // Table header
+    // Table header with blue background
+    doc.setFillColor(...COLORS.primary);
+    doc.rect(margin, currentY, pageWidth - 2 * margin, 8, "F");
+
+    doc.setTextColor(...COLORS.white);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
 
+    const headerY = currentY + 5.5;
+
     if (type === "bon_de_commande") {
-      doc.text("Ord", columns.ord, currentY);
-      doc.text("Désignation", columns.description, currentY);
-      doc.text("Qté", columns.quantity, currentY, { align: "right" });
-      doc.text("P. Unit", columns.unitPrice, currentY, { align: "right" });
-      doc.text("Montant", columns.amount, currentY, { align: "right" });
+      doc.text("Ord", columns.ord + 2, headerY);
+      doc.text("Désignation", columns.description, headerY);
+      doc.text("Qté", columns.quantity, headerY, { align: "right" });
+      doc.text("P. Unit", columns.unitPrice, headerY, { align: "right" });
+      doc.text("Montant", columns.amount - 2, headerY, { align: "right" });
     } else if (type === "bon_de_livraison") {
-      doc.text("Ord", columns.ord, currentY);
-      doc.text("Désignation", columns.description, currentY);
-      doc.text("Qté Livrée", columns.quantity, currentY, { align: "right" });
+      doc.text("Ord", columns.ord + 2, headerY);
+      doc.text("Désignation", columns.description, headerY);
+      doc.text("Qté Livrée", columns.quantity - 2, headerY, { align: "right" });
     } else {
-      doc.text("Description", columns.description, currentY);
-      doc.text("Qté", columns.quantity, currentY, { align: "right" });
-      doc.text("Prix", columns.unitPrice, currentY, { align: "right" });
+      doc.text("Description", columns.description + 2, headerY);
+      doc.text("Qté", columns.quantity, headerY, { align: "right" });
+      doc.text("Prix", columns.unitPrice, headerY, { align: "right" });
       if (hasDiscount) {
-        doc.text("Remise", columns.discount, currentY, { align: "right" });
+        doc.text("Remise", columns.discount, headerY, { align: "right" });
       }
-      doc.text("Montant", columns.amount, currentY, { align: "right" });
+      doc.text("Montant", columns.amount - 2, headerY, { align: "right" });
     }
 
-    currentY += 5;
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.5);
-    doc.line(margin, currentY, pageWidth - margin, currentY);
     currentY += 8;
 
     // Table rows
+    doc.setTextColor(...COLORS.darkText);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
 
     let subtotal = 0;
+    let isAlternateRow = false;
 
     for (let index = 0; index < invoiceData.lines.length; index++) {
       const line = invoiceData.lines[index];
@@ -573,39 +615,51 @@ export const generateInvoicePDF = (
         currentY = 20;
 
         // Redraw header on new page
+        doc.setFillColor(...COLORS.primary);
+        doc.rect(margin, currentY, pageWidth - 2 * margin, 8, "F");
+        doc.setTextColor(...COLORS.white);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(9);
+
+        const newHeaderY = currentY + 5.5;
         if (type === "bon_de_commande") {
-          doc.text("Ord", columns.ord, currentY);
-          doc.text("Désignation", columns.description, currentY);
-          doc.text("Qté", columns.quantity, currentY, { align: "right" });
-          doc.text("P. Unit", columns.unitPrice, currentY, { align: "right" });
-          doc.text("Montant", columns.amount, currentY, { align: "right" });
+          doc.text("Ord", columns.ord + 2, newHeaderY);
+          doc.text("Désignation", columns.description, newHeaderY);
+          doc.text("Qté", columns.quantity, newHeaderY, { align: "right" });
+          doc.text("P. Unit", columns.unitPrice, newHeaderY, {
+            align: "right",
+          });
+          doc.text("Montant", columns.amount - 2, newHeaderY, {
+            align: "right",
+          });
         } else if (type === "bon_de_livraison") {
-          doc.text("Ord", columns.ord, currentY);
-          doc.text("Désignation", columns.description, currentY);
-          doc.text("Qté Livrée", columns.quantity, currentY, {
+          doc.text("Ord", columns.ord + 2, newHeaderY);
+          doc.text("Désignation", columns.description, newHeaderY);
+          doc.text("Qté Livrée", columns.quantity - 2, newHeaderY, {
             align: "right",
           });
         } else {
-          doc.text("Description", columns.description, currentY);
-          doc.text("Qté", columns.quantity, currentY, { align: "right" });
-          doc.text("Prix", columns.unitPrice, currentY, { align: "right" });
+          doc.text("Description", columns.description + 2, newHeaderY);
+          doc.text("Qté", columns.quantity, newHeaderY, { align: "right" });
+          doc.text("Prix", columns.unitPrice, newHeaderY, { align: "right" });
           if (hasDiscount) {
-            doc.text("Remise", columns.discount, currentY, { align: "right" });
+            doc.text("Remise", columns.discount, newHeaderY, {
+              align: "right",
+            });
           }
-          doc.text("Montant", columns.amount, currentY, { align: "right" });
+          doc.text("Montant", columns.amount - 2, newHeaderY, {
+            align: "right",
+          });
         }
-        currentY += 5;
-        doc.line(margin, currentY, pageWidth - margin, currentY);
         currentY += 8;
+        doc.setTextColor(...COLORS.darkText);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8);
+        isAlternateRow = false;
       }
 
       const description = line.description || line.product || "Produit/Service";
       const quantity = line.quantity ? line.quantity.toString() : "0";
-
       const unitPrice = `${formatNumber(parseFloat(line.unit_price || 0))} DA`;
       const discount =
         line.discount > 0 ? `${formatNumber(line.discount)} DA` : "—";
@@ -614,8 +668,22 @@ export const generateInvoicePDF = (
       subtotal += parseFloat(line.line_total || 0);
 
       const rowStartY = currentY;
-      const fixedRowHeight = 8;
-      const verticalCenter = rowStartY + fixedRowHeight / 2;
+      const fixedRowHeight = 10;
+
+      // Alternate row background
+      if (isAlternateRow) {
+        doc.setFillColor(...COLORS.lightGray);
+        doc.rect(
+          margin,
+          rowStartY,
+          pageWidth - 2 * margin,
+          fixedRowHeight,
+          "F"
+        );
+      }
+      isAlternateRow = !isAlternateRow;
+
+      const verticalCenter = rowStartY + fixedRowHeight / 2 + 1;
 
       let descriptionLines: string[];
       try {
@@ -632,13 +700,15 @@ export const generateInvoicePDF = (
       }
 
       if (type === "bon_de_commande" || type === "bon_de_livraison") {
-        doc.text((index + 1).toString(), columns.ord, verticalCenter);
+        doc.text((index + 1).toString(), columns.ord + 2, verticalCenter);
       }
 
       if (descriptionLines.length === 1) {
         doc.text(
           descriptionLines[0].trim(),
-          columns.description,
+          type === "bon_de_commande" || type === "bon_de_livraison"
+            ? columns.description
+            : columns.description + 2,
           verticalCenter
         );
       } else {
@@ -647,14 +717,21 @@ export const generateInvoicePDF = (
           if (descLine && typeof descLine === "string") {
             doc.text(
               descLine.trim(),
-              columns.description,
+              type === "bon_de_commande" || type === "bon_de_livraison"
+                ? columns.description
+                : columns.description + 2,
               descStartY + lineIndex * 4
             );
           }
         });
       }
 
-      doc.text(quantity, columns.quantity, verticalCenter, { align: "right" });
+      doc.text(
+        quantity,
+        columns.quantity - (type === "bon_de_livraison" ? 2 : 0),
+        verticalCenter,
+        { align: "right" }
+      );
 
       if (type !== "bon_de_livraison") {
         doc.text(unitPrice, columns.unitPrice, verticalCenter, {
@@ -667,10 +744,10 @@ export const generateInvoicePDF = (
           });
         }
 
-        doc.text(total, columns.amount, verticalCenter, { align: "right" });
+        doc.text(total, columns.amount - 2, verticalCenter, { align: "right" });
       }
 
-      currentY = rowStartY + fixedRowHeight + 2;
+      currentY = rowStartY + fixedRowHeight;
 
       doc.setDrawColor(200);
       doc.setLineWidth(0.1);
@@ -678,6 +755,11 @@ export const generateInvoicePDF = (
 
       currentY += 2;
     }
+
+    // Bottom border for table
+    doc.setDrawColor(...COLORS.primary);
+    doc.setLineWidth(0.5);
+    doc.line(margin, currentY, pageWidth - margin, currentY);
 
     // Totals section
     if (type !== "bon_de_livraison") {
@@ -692,40 +774,64 @@ export const generateInvoicePDF = (
       const grandTotalFormatted = formatNumber(grandTotal);
 
       const totalsRight = pageWidth - margin;
+      const totalsBoxWidth = 80;
+      const totalsBoxX = pageWidth - margin - totalsBoxWidth;
 
       if (tvaRate === 0) {
+        doc.setFillColor(...COLORS.primary);
+        doc.roundedRect(
+          totalsBoxX,
+          currentY - 3,
+          totalsBoxWidth,
+          10,
+          2,
+          2,
+          "F"
+        );
+        doc.setTextColor(...COLORS.white);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(10);
-        doc.text("Montant HT", totalsRight - 60, currentY, { align: "right" });
-        doc.text(`${subtotalFormatted} DA`, totalsRight, currentY, {
+        doc.text("Montant total", totalsBoxX + 5, currentY + 3);
+        doc.text(`${subtotalFormatted} DA`, totalsRight - 5, currentY + 3, {
           align: "right",
         });
       } else {
+        doc.setTextColor(...COLORS.darkText);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
-        doc.text("Montant HT", totalsRight - 60, currentY, { align: "right" });
-        doc.text(`${subtotalFormatted} DA`, totalsRight, currentY, {
+        doc.text("Montant HT", totalsBoxX + 5, currentY);
+        doc.text(`${subtotalFormatted} DA`, totalsRight - 5, currentY, {
           align: "right",
         });
         currentY += 6;
 
-        doc.text(`TVA (${tvaRate}%)`, totalsRight - 60, currentY, {
+        doc.text(`TVA (${tvaRate}%)`, totalsBoxX + 5, currentY);
+        doc.text(`${tvaFormatted} DA`, totalsRight - 5, currentY, {
           align: "right",
         });
-        doc.text(`${tvaFormatted} DA`, totalsRight, currentY, {
-          align: "right",
-        });
-        currentY += 6;
+        currentY += 8;
 
+        doc.setFillColor(...COLORS.primary);
+        doc.roundedRect(
+          totalsBoxX,
+          currentY - 3,
+          totalsBoxWidth,
+          10,
+          2,
+          2,
+          "F"
+        );
+        doc.setTextColor(...COLORS.white);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(10);
-        doc.text("TOTAL TTC", totalsRight - 60, currentY, { align: "right" });
-        doc.text(`${grandTotalFormatted} DA`, totalsRight, currentY, {
+        doc.text("Montant total", totalsBoxX + 5, currentY + 3);
+        doc.text(`${grandTotalFormatted} DA`, totalsRight - 5, currentY + 3, {
           align: "right",
         });
       }
 
-      currentY += 8;
+      currentY += 12;
+      doc.setTextColor(...COLORS.darkText);
 
       // Amount in words - for facture and facture_proforma
       if (type === "facture" || type === "facture_proforma") {
@@ -758,18 +864,15 @@ export const generateInvoicePDF = (
     currentY += 15;
 
     const boxY = currentY;
-    const boxHeight = 45;
+    const boxHeight = 50;
     const boxWidth = pageWidth - 2 * margin;
 
-    doc.setFillColor(245, 245, 245);
-    doc.rect(margin, boxY, boxWidth, boxHeight, "F");
+    doc.setFillColor(...COLORS.primaryLight);
+    doc.roundedRect(margin, boxY, boxWidth, boxHeight, 3, 3, "F");
 
-    doc.setDrawColor(100, 100, 100);
-    doc.setLineWidth(0.5);
-    doc.rect(margin, boxY, boxWidth, boxHeight);
+    currentY = boxY + 15;
 
-    currentY = boxY + 12;
-
+    doc.setTextColor(...COLORS.white);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     doc.text("MONTANT DE L'ACOMPTE VERSÉ", pageWidth / 2, currentY, {
@@ -778,15 +881,13 @@ export const generateInvoicePDF = (
 
     currentY += 10;
 
-    doc.setFontSize(16);
-    doc.setTextColor(0, 100, 0);
+    doc.setFontSize(18);
     doc.text(
       `${formatNumber(invoiceData.invoice.deposit_price)} DA`,
       pageWidth / 2,
       currentY,
       { align: "center" }
     );
-    doc.setTextColor(0, 0, 0);
 
     currentY += 10;
 
@@ -802,6 +903,7 @@ export const generateInvoicePDF = (
     });
 
     currentY = boxY + boxHeight + 20;
+    doc.setTextColor(...COLORS.darkText);
 
     if (invoiceData.invoice.facture) {
       doc.setFont("helvetica", "bold");
@@ -843,9 +945,9 @@ export const generateInvoicePDF = (
 
         doc.setFont("helvetica", "bold");
         doc.text("Reste à payer:", margin, currentY);
-        doc.setTextColor(200, 0, 0);
+        doc.setTextColor(...COLORS.danger);
         doc.text(`${formatNumber(remainingAmount)} DA`, margin + 35, currentY);
-        doc.setTextColor(0, 0, 0);
+        doc.setTextColor(...COLORS.darkText);
         currentY += 10;
       }
     }
@@ -883,8 +985,10 @@ export const generateInvoicePDF = (
   //   currentY += 8;
   // }
 
+  // currentY += 20;
+
   // Signature area
-  const signatureY = Math.max(currentY + 15, pageHeight - 40);
+  const signatureY = Math.max(currentY + 10, pageHeight - 40);
 
   if (type === "bon_de_commande") {
     doc.setFontSize(9);
@@ -935,8 +1039,20 @@ export const generateInvoicePDF = (
     });
   }
 
-  // Footer
-  doc.setFontSize(7);
+  // Footer with blue background
+  const footerY = pageHeight - 15;
+  doc.setFillColor(...COLORS.primary);
+  doc.rect(0, footerY, pageWidth, 15, "F");
+
+  doc.setTextColor(...COLORS.white);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text(`Notre site web :`, pageWidth / 2, footerY + 6, {
+    align: "center",
+  });
+  doc.text(`https://kr7fibre.com`, pageWidth / 2, footerY + 11, {
+    align: "center",
+  });
 
   // Save the PDF
   doc.save(`${type}_${documentNumber}.pdf`);

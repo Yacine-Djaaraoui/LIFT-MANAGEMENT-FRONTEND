@@ -1,6 +1,14 @@
 import React, { useState } from "react";
 import { useProducts, useDeleteProduct } from "@/hooks/useProducts";
-import { Plus, Search, Edit, Trash2, AlertTriangle } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,11 +37,14 @@ export const Stock: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [successMessage, setSuccessMessage] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
   const {
     data: productsData,
     isLoading,
     error,
+    refetch,
   } = useProducts({
     search: searchTerm,
     page: currentPage.toString(),
@@ -43,8 +54,35 @@ export const Stock: React.FC = () => {
 
   const deleteMutation = useDeleteProduct();
 
-  const handleDelete = (id: string) => {
-    deleteMutation.mutate(id);
+  const showMessage = (message: string, type: "success" | "error") => {
+    if (type === "success") {
+      setSuccessMessage(message);
+      setErrorMessage("");
+    } else {
+      setErrorMessage(message);
+      setSuccessMessage("");
+    }
+
+    // Auto hide after 5 seconds
+    setTimeout(() => {
+      if (type === "success") {
+        setSuccessMessage("");
+      } else {
+        setErrorMessage("");
+      }
+    }, 5000);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteMutation.mutateAsync(id);
+      showMessage("Produit supprimé avec succès", "success");
+      refetch();
+    } catch (error: any) {
+      const message =
+        error?.message || "Erreur lors de la suppression du produit";
+      showMessage(message, "error");
+    }
   };
 
   const handleEdit = (product: any) => {
@@ -57,21 +95,64 @@ export const Stock: React.FC = () => {
     setIsFormOpen(true);
   };
 
-  const handleFormClose = () => {
+  const handleFormClose = (success: boolean = false) => {
     setIsFormOpen(false);
     setEditingProduct(null);
+    if (success) {
+      refetch();
+    }
   };
+
+  const handleFormSuccess = () => {
+    handleFormClose(true);
+    showMessage(
+      editingProduct
+        ? "Produit modifié avec succès"
+        : "Produit créé avec succès",
+      "success"
+    );
+  };
+
+  // Clear messages when search term changes
+  React.useEffect(() => {
+    setSuccessMessage("");
+    setErrorMessage("");
+  }, [searchTerm]);
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
-        Erreur lors du chargement des produits
+      <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded flex items-start">
+        <XCircle className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" />
+        <div>
+          <p className="font-medium">Erreur</p>
+          <p className="text-sm">{error.message}</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {/* Success Message */}
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded flex items-center">
+          <CheckCircle className="w-5 h-5 mr-2  flex-shrink-0" />
+          <div>
+            <p className="text-sm">{successMessage}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {errorMessage && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded flex items-center">
+          <XCircle className="w-5 h-5 mr-2  flex-shrink-0" />
+          <div>
+            <p className="text-sm">{errorMessage}</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">Gestion du Stock</h1>
         <Button onClick={handleCreate}>
@@ -102,7 +183,6 @@ export const Stock: React.FC = () => {
               <TableHead className="text-left">Quantité</TableHead>
               <TableHead className="text-left">Prix d'achat</TableHead>
               <TableHead className="text-left">Prix de vente</TableHead>
-              {/* <TableHead className="text-left">Marge</TableHead> */}
               <TableHead className="text-left">Statut</TableHead>
               <TableHead className="text-left">Actions</TableHead>
             </TableRow>
@@ -141,8 +221,11 @@ export const Stock: React.FC = () => {
               </>
             ) : productsData?.results?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-4">
-                  Aucun produit trouvé
+                <TableCell colSpan={7} className="text-center py-8">
+                  <div className="flex flex-col items-center text-gray-500">
+                    <Search className="w-12 h-12 mb-2" />
+                    <p>Aucun produit trouvé</p>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -170,9 +253,6 @@ export const Stock: React.FC = () => {
                   <TableCell className="text-left">
                     {product.selling_price} DA
                   </TableCell>
-                  {/* <TableCell className="text-left">
-                    {product.calculate_profit_margin?.toFixed(2)}%
-                  </TableCell> */}
                   <TableCell className="text-left">
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -195,7 +275,11 @@ export const Stock: React.FC = () => {
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="sm">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={deleteMutation.isPending}
+                          >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </AlertDialogTrigger>
@@ -210,12 +294,19 @@ export const Stock: React.FC = () => {
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogCancel
+                              disabled={deleteMutation.isPending}
+                            >
+                              Annuler
+                            </AlertDialogCancel>
                             <AlertDialogAction
                               onClick={() => handleDelete(product.id)}
                               className="bg-red-600 hover:bg-red-700"
+                              disabled={deleteMutation.isPending}
                             >
-                              Supprimer
+                              {deleteMutation.isPending
+                                ? "Suppression..."
+                                : "Supprimer"}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
@@ -260,6 +351,7 @@ export const Stock: React.FC = () => {
       <ProductForm
         open={isFormOpen}
         onClose={handleFormClose}
+        onSuccess={handleFormSuccess}
         product={editingProduct}
       />
     </div>

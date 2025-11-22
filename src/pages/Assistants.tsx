@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useAssistants, useDeleteAssistant } from "@/hooks/useAssistants";
-import { Plus, Search, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,11 +29,14 @@ export const Assistants: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingAssistant, setEditingAssistant] = useState<any>(null);
+  const [successMessage, setSuccessMessage] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
   const {
     data: assistantsData,
     isLoading,
     error,
+    refetch,
   } = useAssistants({
     search: searchTerm,
     page: currentPage.toString(),
@@ -43,8 +46,37 @@ export const Assistants: React.FC = () => {
 
   const deleteMutation = useDeleteAssistant();
 
-  const handleDelete = (id: string) => {
-    deleteMutation.mutate(id);
+  const showMessage = (message: string, type: "success" | "error") => {
+    if (type === "success") {
+      setSuccessMessage(message);
+      setErrorMessage("");
+    } else {
+      setErrorMessage(message);
+      setSuccessMessage("");
+    }
+
+    // Auto hide after 5 seconds
+    setTimeout(() => {
+      if (type === "success") {
+        setSuccessMessage("");
+      } else {
+        setErrorMessage("");
+      }
+    }, 5000);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteMutation.mutateAsync(id);
+      showMessage("Assistant supprimé avec succès", "success");
+      refetch();
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Erreur lors de la suppression de l'assistant";
+      showMessage(message, "error");
+    }
   };
 
   const handleEdit = (assistant: any) => {
@@ -57,21 +89,58 @@ export const Assistants: React.FC = () => {
     setIsFormOpen(true);
   };
 
-  const handleFormClose = () => {
+  const handleFormClose = (success: boolean = false) => {
     setIsFormOpen(false);
     setEditingAssistant(null);
+    if (success) {
+      refetch();
+    }
   };
 
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
-        Erreur lors du chargement des assistants
-      </div>
+  const handleFormSuccess = () => {
+    handleFormClose(true);
+    showMessage(
+      editingAssistant
+        ? "Assistant modifié avec succès"
+        : "Assistant créé avec succès",
+      "success"
     );
-  }
+  };
+
+  // Clear messages when search term changes
+  React.useEffect(() => {
+    setSuccessMessage("");
+    setErrorMessage("");
+  }, [searchTerm]);
+
+  // Show error from useAssistants hook
+  React.useEffect(() => {
+    if (error) {
+      showMessage(
+        error.message || "Erreur lors du chargement des assistants",
+        "error"
+      );
+    }
+  }, [error]);
 
   return (
     <div className="space-y-6">
+      {/* Success Message */}
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded flex items-center">
+          <CheckCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+          <p className="text-sm">{successMessage}</p>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {errorMessage && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded flex items-center">
+          <XCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+          <p className="text-sm">{errorMessage}</p>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">
           Gestion des Assistants
@@ -132,9 +201,6 @@ export const Assistants: React.FC = () => {
                       <div className="h-4 bg-gray-200 rounded w-16"></div>
                     </TableCell>
                     <TableCell className="py-4">
-                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                    </TableCell>
-                    <TableCell className="py-4">
                       <div className="flex justify-start space-x-2">
                         <div className="h-8 w-8 bg-gray-200 rounded"></div>
                         <div className="h-8 w-8 bg-gray-200 rounded"></div>
@@ -145,8 +211,11 @@ export const Assistants: React.FC = () => {
               </>
             ) : assistantsData?.results?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-4">
-                  Aucun assistant trouvé
+                <TableCell colSpan={6} className="text-center py-8">
+                  <div className="flex flex-col items-center text-gray-500">
+                    <Search className="w-12 h-12 mb-2" />
+                    <p>Aucun assistant trouvé</p>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -188,6 +257,7 @@ export const Assistants: React.FC = () => {
                             variant="outline"
                             size="sm"
                             className="flex items-center justify-center w-8 h-8 p-0"
+                            disabled={deleteMutation.isPending}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -204,12 +274,19 @@ export const Assistants: React.FC = () => {
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogCancel
+                              disabled={deleteMutation.isPending}
+                            >
+                              Annuler
+                            </AlertDialogCancel>
                             <AlertDialogAction
                               onClick={() => handleDelete(assistant.id)}
                               className="bg-red-600 hover:bg-red-700"
+                              disabled={deleteMutation.isPending}
                             >
-                              Supprimer
+                              {deleteMutation.isPending
+                                ? "Suppression..."
+                                : "Supprimer"}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
@@ -254,6 +331,7 @@ export const Assistants: React.FC = () => {
       <AssistantForm
         open={isFormOpen}
         onClose={handleFormClose}
+        onSuccess={handleFormSuccess}
         assistant={editingAssistant}
       />
     </div>

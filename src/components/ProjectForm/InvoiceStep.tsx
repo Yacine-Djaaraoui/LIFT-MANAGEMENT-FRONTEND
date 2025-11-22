@@ -290,7 +290,7 @@ export const InvoiceStep: React.FC<InvoiceStepProps> = ({
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <Label htmlFor="due_date">Date d'échéance</Label>
+            <Label htmlFor="due_date">Date de facture</Label>
             <Input
               id="due_date"
               type="date"

@@ -23,10 +23,12 @@ import {
   useCreateInvoiceLines,
   useInvoices,
 } from "@/hooks/useInvoices";
+import { XCircle, CheckCircle } from "lucide-react";
 
 interface ProjectFormProps {
   open: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
   project?: any;
 }
 
@@ -129,6 +131,7 @@ const cleanInvoiceLineData = (line: any) => {
 export const ProjectForm: React.FC<ProjectFormProps> = ({
   open,
   onClose,
+  onSuccess,
   project,
 }) => {
   const [step, setStep] = useState(1);
@@ -145,6 +148,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
   const [existingInvoiceLines, setExistingInvoiceLines] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
 
   const createProjectMutation = useCreateProject();
   const updateProjectMutation = useUpdateProject();
@@ -219,6 +223,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
       setExistingInvoiceLines([]);
       setIsInitialized(true);
       setSubmitError(null);
+      setSubmitSuccess(null);
     }
   }, [open, project, isInitialized]);
 
@@ -331,6 +336,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
       setIsInitialized(false);
       setClientSearchName("");
       setSubmitError(null);
+      setSubmitSuccess(null);
     }
   }, [open]);
 
@@ -436,6 +442,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
 
     setIsSubmitting(true);
     setSubmitError(null);
+    setSubmitSuccess(null);
 
     try {
       // Prepare project data for API - remove empty values but keep 0
@@ -463,7 +470,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
           name: projectData.name,
           client: selectedClient.id,
           start_date: projectData.start_date,
-          end_date: projectData.end_date || "",
+          // end_date: projectData.end_date || "",
           description: projectData.description || "",
           warranty_years: projectData.warranty_years,
           warranty_months: projectData.warranty_months,
@@ -472,7 +479,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
           interval_maintenance: projectData.interval_maintenance,
         });
 
-        // Compare employers arrays
+  // Compare employers arrays
         const currentEmployers =
           project.assigned_employers?.map((e: any) =>
             typeof e === "object" ? e.id : e
@@ -581,7 +588,19 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
         }
       }
 
-      handleClose();
+      setSubmitSuccess(
+        project ? "Projet modifié avec succès" : "Projet créé avec succès"
+      );
+
+      // Call onSuccess callback if provided
+      if (onSuccess) {
+        onSuccess();
+      }
+
+      // Close after a short delay to show the success message
+      setTimeout(() => {
+        handleClose();
+      }, 1500);
     } catch (error: any) {
       console.error("❌ Error saving project:", error);
       setSubmitError(
@@ -605,6 +624,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
     setExistingInvoiceId(null);
     setExistingInvoiceLines([]);
     setSubmitError(null);
+    setSubmitSuccess(null);
     setIsSubmitting(false);
     onClose();
   };
@@ -689,6 +709,14 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
           </DialogTitle>
         </DialogHeader>
 
+        {/* Success Message in Form */}
+        {submitSuccess && (
+          <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded flex items-center">
+            <CheckCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+            <p className="text-sm">{submitSuccess}</p>
+          </div>
+        )}
+
         {/* Loading state for client search */}
         {isLoadingClient && (
           <div className="p-4 text-center text-gray-500">
@@ -698,13 +726,9 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
 
         {/* Error Display */}
         {submitError && (
-          <div className="p-4 mt-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
-            <h3 className="font-bold">Erreur:</h3>
-            <p>{submitError}</p>
-            <p className="text-sm mt-2">
-              Si le problème persiste, veuillez réessayer dans quelques
-              instants.
-            </p>
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded flex items-center">
+            <XCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+            <p className="text-sm">{submitError}</p>
           </div>
         )}
 

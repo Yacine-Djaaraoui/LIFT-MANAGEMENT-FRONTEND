@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AlertCircle } from "lucide-react";
 
 // Updated schema with all fields as optional for updates
 const employerSchema = yup.object({
@@ -36,12 +37,14 @@ interface EmployerFormProps {
   open: boolean;
   onClose: () => void;
   employer?: any;
+  onSuccess?: (message: string) => void;
 }
 
 export const EmployerForm: React.FC<EmployerFormProps> = ({
   open,
   onClose,
   employer,
+  onSuccess,
 }) => {
   const createMutation = useCreateEmployer();
   const updateMutation = useUpdateEmployer();
@@ -52,6 +55,7 @@ export const EmployerForm: React.FC<EmployerFormProps> = ({
     formState: { errors },
     reset,
     setValue,
+    setError,
   } = useForm<EmployerFormData>({
     resolver: yupResolver(employerSchema),
     defaultValues: {
@@ -101,6 +105,9 @@ export const EmployerForm: React.FC<EmployerFormProps> = ({
       // Prepare data for submission - only include changed fields
       const submitData: any = {};
 
+      let result;
+      let successMessage = "";
+
       // For update: only include fields that have been changed and are not empty
       if (employer) {
         if (data.username && data.username !== employer.username) {
@@ -134,10 +141,11 @@ export const EmployerForm: React.FC<EmployerFormProps> = ({
         // Only call update if there are changes
         if (Object.keys(submitData).length > 0) {
           console.log("dkhol b ", submitData);
-          await updateMutation.mutateAsync({
+          result = await updateMutation.mutateAsync({
             id: employer.id,
             data: submitData,
           });
+          successMessage = "Employé modifié avec succès";
         } else {
           console.log("No changes detected");
           handleClose();
@@ -159,16 +167,62 @@ export const EmployerForm: React.FC<EmployerFormProps> = ({
         if (data.group) createData.group = data.group;
 
         console.log("Creating employer with data:", createData);
-        await createMutation.mutateAsync(createData);
+        result = await createMutation.mutateAsync(createData);
+        successMessage = "Employé créé avec succès";
       }
 
       handleClose();
-    } catch (error) {
-      console.error("Error saving employer:", error);
+
+      // Call onSuccess callback if provided
+      if (onSuccess && result) {
+        onSuccess(successMessage);
+      }
+    } catch (error: any) {
+      // Handle backend validation errors
+      const backendErrors = error?.response?.data;
+
+      if (backendErrors) {
+        // Set form errors for field-specific validation
+        Object.keys(backendErrors).forEach((field) => {
+          if (field in employerSchema.fields) {
+            setError(field as keyof EmployerFormData, {
+              type: "server",
+              message: Array.isArray(backendErrors[field])
+                ? backendErrors[field][0]
+                : backendErrors[field],
+            });
+          }
+        });
+
+        // Show general error message if no field-specific errors
+        if (
+          !Object.keys(backendErrors).some(
+            (field) => field in employerSchema.fields
+          )
+        ) {
+          const generalError =
+            backendErrors.message ||
+            backendErrors.detail ||
+            "Une erreur est survenue lors de l'enregistrement";
+          setError("root", {
+            type: "server",
+            message: generalError,
+          });
+        }
+      } else {
+        // Handle network or other errors
+        setError("root", {
+          type: "server",
+          message: error?.message || "Une erreur réseau est survenue",
+        });
+      }
     }
   };
 
   const handleClose = () => {
+    // Reset mutations when closing
+    createMutation.reset();
+    updateMutation.reset();
     reset();
     onClose();
   };
@@ -177,12 +231,20 @@ export const EmployerForm: React.FC<EmployerFormProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {employer ? "Modifier l'Employé" : "Créer un Nouvel Employé"}
           </DialogTitle>
         </DialogHeader>
+
+        {/* General Error Alert */}
+        {errors.root && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded flex items-center">
+            <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+            <p className="text-sm">{errors.root.message}</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -194,6 +256,7 @@ export const EmployerForm: React.FC<EmployerFormProps> = ({
                 id="username"
                 {...register("username")}
                 placeholder="Nom d'utilisateur"
+                disabled={isLoading}
               />
               {errors.username && (
                 <p className="text-red-500 text-sm mt-1">
@@ -214,6 +277,7 @@ export const EmployerForm: React.FC<EmployerFormProps> = ({
                 type="password"
                 {...register("password")}
                 placeholder={employer ? "Nouveau mot de passe" : "Mot de passe"}
+                disabled={isLoading}
               />
               {errors.password && (
                 <p className="text-red-500 text-sm mt-1">
@@ -234,6 +298,7 @@ export const EmployerForm: React.FC<EmployerFormProps> = ({
                 type="email"
                 {...register("email")}
                 placeholder="email@exemple.com"
+                disabled={isLoading}
               />
               {errors.email && (
                 <p className="text-red-500 text-sm mt-1">
@@ -253,6 +318,7 @@ export const EmployerForm: React.FC<EmployerFormProps> = ({
                 id="phone_number"
                 {...register("phone_number")}
                 placeholder="Numéro de téléphone"
+                disabled={isLoading}
               />
               {employer && (
                 <p className="text-xs text-gray-500 mt-1">
@@ -267,6 +333,7 @@ export const EmployerForm: React.FC<EmployerFormProps> = ({
                 id="first_name"
                 {...register("first_name")}
                 placeholder="Prénom"
+                disabled={isLoading}
               />
               {employer && (
                 <p className="text-xs text-gray-500 mt-1">
@@ -281,6 +348,7 @@ export const EmployerForm: React.FC<EmployerFormProps> = ({
                 id="last_name"
                 {...register("last_name")}
                 placeholder="Nom"
+                disabled={isLoading}
               />
               {employer && (
                 <p className="text-xs text-gray-500 mt-1">
@@ -291,7 +359,12 @@ export const EmployerForm: React.FC<EmployerFormProps> = ({
 
             <div>
               <Label htmlFor="wilaya">Wilaya</Label>
-              <Input id="wilaya" {...register("wilaya")} placeholder="Wilaya" />
+              <Input
+                id="wilaya"
+                {...register("wilaya")}
+                placeholder="Wilaya"
+                disabled={isLoading}
+              />
               {employer && (
                 <p className="text-xs text-gray-500 mt-1">
                   Laisser vide pour garder la valeur actuelle
@@ -300,11 +373,12 @@ export const EmployerForm: React.FC<EmployerFormProps> = ({
             </div>
 
             <div>
-              <Label htmlFor="group">group</Label>
+              <Label htmlFor="group">Groupe</Label>
               <Input
                 id="group"
                 {...register("group")}
-                placeholder="group d'affectation"
+                placeholder="Groupe d'affectation"
+                disabled={isLoading}
               />
               {employer && (
                 <p className="text-xs text-gray-500 mt-1">
@@ -315,7 +389,12 @@ export const EmployerForm: React.FC<EmployerFormProps> = ({
           </div>
 
           <div className="flex justify-end space-x-4">
-            <Button type="button" variant="outline" onClick={handleClose}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={isLoading}
+            >
               Annuler
             </Button>
             <Button type="submit" disabled={isLoading}>

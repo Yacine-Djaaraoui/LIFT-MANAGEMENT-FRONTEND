@@ -17,13 +17,22 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { data: user, isLoading } = useCurrentUser();
+  const { data: user, isLoading, error } = useCurrentUser();
   const token = localStorage.getItem("access_token");
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-lg">Chargement...</div>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded mb-4">
+          {error.message}
+        </div>{" "}
       </div>
     );
   }
@@ -37,8 +46,9 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
 
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const token = localStorage.getItem("access_token");
+  const { data: user, isLoading, error } = useCurrentUser();
 
-  if (token) {
+  if (token && user) {
     return <Navigate to="/statistics" replace />;
   }
 
@@ -46,8 +56,6 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 export const AllRoutes: React.FC = () => {
-  const { data: user, isLoading } = useCurrentUser();
-
   return (
     <>
       <ScrollToTop /> {/* <-- added here, works for ALL pages */}

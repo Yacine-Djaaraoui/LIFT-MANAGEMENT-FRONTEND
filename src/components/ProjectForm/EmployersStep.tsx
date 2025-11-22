@@ -213,7 +213,7 @@ export const EmployersStep: React.FC<EmployersStepProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
         <h3 className="text-lg font-medium">Assigner les Employés</h3>
         <p className="text-sm text-gray-600">
@@ -412,7 +412,7 @@ export const EmployersStep: React.FC<EmployersStepProps> = ({
               : "Aucun employé trouvé"}
           </div>
         ) : (
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-60 overflow-y-auto">
             {employersData?.results?.map((employer: Employer) => (
               <div
                 key={employer.id}
@@ -483,7 +483,7 @@ export const EmployersStep: React.FC<EmployersStepProps> = ({
         </div>
       )}
 
-      <div className="flex justify-between pt-4">
+      <div className="flex justify-between pt-2">
         <Button variant="outline" onClick={onBack}>
           Retour
         </Button>

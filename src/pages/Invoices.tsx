@@ -56,6 +56,8 @@ export const Invoices: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [documentsDialogOpen, setDocumentsDialogOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [successMessage, setSuccessMessage] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
   // Filters state
   const [filters, setFilters] = useState({
@@ -72,13 +74,45 @@ export const Invoices: React.FC = () => {
     status: filters.status === "all" ? "" : filters.status,
   };
 
-  const { data: invoicesData, isLoading, error } = useInvoices(apiParams);
+  const {
+    data: invoicesData,
+    isLoading,
+    error,
+    refetch,
+  } = useInvoices(apiParams);
 
   const deleteMutation = useDeleteInvoice();
   const updateInvoiceStatusMutation = useUpdateInvoiceStatus();
 
-  const handleDelete = (id: string) => {
-    deleteMutation.mutate(id);
+  const showMessage = (message: string, type: "success" | "error") => {
+    if (type === "success") {
+      setSuccessMessage(message);
+      setErrorMessage("");
+    } else {
+      setErrorMessage(message);
+      setSuccessMessage("");
+    }
+
+    // Auto hide after 5 seconds
+    setTimeout(() => {
+      if (type === "success") {
+        setSuccessMessage("");
+      } else {
+        setErrorMessage("");
+      }
+    }, 5000);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteMutation.mutateAsync(id);
+      showMessage("Facture supprimée avec succès", "success");
+      refetch();
+    } catch (error: any) {
+      const message =
+        error?.message || "Erreur lors de la suppression de la facture";
+      showMessage(message, "error");
+    }
   };
 
   const handleMarkAsPaid = async (invoice: any) => {
@@ -88,8 +122,14 @@ export const Invoices: React.FC = () => {
         action: "mark_paid",
       });
       setInvoiceToMarkPaid(null);
-    } catch (error) {
+      showMessage("Facture marquée comme payée avec succès", "success");
+      refetch();
+    } catch (error: any) {
       console.error("Error marking invoice as paid:", error);
+      const message =
+        error?.message || "Erreur lors du marquage de la facture comme payée";
+      showMessage(message, "error");
+      setInvoiceToMarkPaid(null);
     }
   };
 
@@ -180,16 +220,34 @@ export const Invoices: React.FC = () => {
 
   const hasActiveFilters = filters.status !== "all";
 
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
-        Erreur lors du chargement des factures
-      </div>
-    );
-  }
+  // Show error from useInvoices hook
+  React.useEffect(() => {
+    if (error) {
+      showMessage(
+        error.message || "Erreur lors du chargement des factures",
+        "error"
+      );
+    }
+  }, [error]);
 
   return (
     <div className="space-y-6">
+      {/* Success Message */}
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded flex items-center">
+          <CheckCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+          <p className="text-sm">{successMessage}</p>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {errorMessage && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded flex items-center">
+          <X className="w-5 h-5 mr-2 flex-shrink-0" />
+          <p className="text-sm">{errorMessage}</p>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">
           Gestion des Factures
@@ -368,6 +426,7 @@ export const Invoices: React.FC = () => {
                             variant="outline"
                             size="sm"
                             className="flex items-center justify-center w-8 h-8 p-0"
+                            disabled={deleteMutation.isPending}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -384,12 +443,19 @@ export const Invoices: React.FC = () => {
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogCancel
+                              disabled={deleteMutation.isPending}
+                            >
+                              Annuler
+                            </AlertDialogCancel>
                             <AlertDialogAction
                               onClick={() => handleDelete(invoice.id)}
                               className="bg-red-600 hover:bg-red-700"
+                              disabled={deleteMutation.isPending}
                             >
-                              Supprimer
+                              {deleteMutation.isPending
+                                ? "Suppression..."
+                                : "Supprimer"}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
@@ -524,7 +590,9 @@ export const Invoices: React.FC = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={updateInvoiceStatusMutation.isPending}>
+              Annuler
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => handleMarkAsPaid(invoiceToMarkPaid)}
               className="bg-green-600 hover:bg-green-700"

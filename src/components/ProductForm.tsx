@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useCurrentUser } from "@/hooks/useAuth";
+import { AlertCircle, CheckCircle } from "lucide-react";
 
 // Make optional fields truly optional with proper transformation
 const productSchema = yup.object({
@@ -52,12 +53,14 @@ type ProductFormData = yup.InferType<typeof productSchema>;
 interface ProductFormProps {
   open: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
   product?: any;
 }
 
 export const ProductForm: React.FC<ProductFormProps> = ({
   open,
   onClose,
+  onSuccess,
   product,
 }) => {
   const { data: user } = useCurrentUser();
@@ -71,6 +74,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     formState: { errors },
     reset,
     watch,
+    setError,
   } = useForm<ProductFormData>({
     resolver: yupResolver(productSchema),
     defaultValues: {
@@ -154,18 +158,65 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       } else {
         await createMutation.mutateAsync(apiData);
       }
+
+      // Call success callback if provided
+      if (onSuccess) {
+        onSuccess();
+      }
       handleClose();
-    } catch (error) {
-      console.error("Error saving product:", error);
+    } catch (error: any) {
+      // Handle backend validation errors
+      const backendErrors = error?.response?.data;
+
+      if (backendErrors) {
+        // Set form errors for field-specific validation
+        Object.keys(backendErrors).forEach((field) => {
+          if (field in productSchema.fields) {
+            setError(field as keyof ProductFormData, {
+              type: "server",
+              message: Array.isArray(backendErrors[field])
+                ? backendErrors[field][0]
+                : backendErrors[field],
+            });
+          }
+        });
+
+        // Show general error message if no field-specific errors
+        if (
+          !Object.keys(backendErrors).some(
+            (field) => field in productSchema.fields
+          )
+        ) {
+          const generalError =
+            backendErrors.message ||
+            backendErrors.detail ||
+            "Une erreur est survenue";
+          // Set a general form error
+          setError("root", {
+            type: "server",
+            message: generalError,
+          });
+        }
+      } else {
+        // Handle network or other errors
+        setError("root", {
+          type: "server",
+          message: error?.message || "Une erreur réseau est survenue",
+        });
+      }
     }
   };
 
   const handleClose = () => {
+    // Reset mutations when closing
+    createMutation.reset();
+    updateMutation.reset();
     reset();
     onClose();
   };
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
+  const currentMutation = product ? updateMutation : createMutation;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -178,6 +229,31 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           </DialogTitle>
         </DialogHeader>
 
+        {/* General Error Alert */}
+        {errors.root && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded flex items-start">
+            <AlertCircle className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-medium">Erreur</p>
+              <p className="text-sm">{errors.root.message}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Success Message */}
+        {currentMutation.isSuccess && (
+          <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded flex items-start">
+            <CheckCircle className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm">
+                {product
+                  ? "Produit modifié avec succès"
+                  : "Produit créé avec succès"}
+              </p>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Basic Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -189,6 +265,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 id="name"
                 {...register("name")}
                 placeholder="Nom du produit"
+                disabled={isLoading}
               />
               {errors.name && (
                 <p className="text-red-500 text-sm mt-1">
@@ -205,7 +282,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 id="sku"
                 {...register("sku")}
                 placeholder="Code du produit"
+                disabled={isLoading}
               />
+              {errors.sku && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.sku.message}
+                </p>
+              )}
             </div>
 
             <div>
@@ -216,7 +299,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 id="unit"
                 {...register("unit")}
                 placeholder="Ex: pièce, mètre, kg"
+                disabled={isLoading}
               />
+              {errors.unit && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.unit.message}
+                </p>
+              )}
             </div>
 
             <div>
@@ -226,6 +315,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 type="number"
                 min="0"
                 {...register("quantity", { valueAsNumber: true })}
+                disabled={isLoading}
               />
               {errors.quantity && (
                 <p className="text-red-500 text-sm mt-1">
@@ -241,10 +331,16 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 type="number"
                 min="0"
                 {...register("reorder_threshold", { valueAsNumber: true })}
+                disabled={isLoading}
               />
               <p className="text-sm text-gray-600 mt-1">
                 Alerte lorsque le stock est inférieur ou égal à ce nombre
               </p>
+              {errors.reorder_threshold && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.reorder_threshold.message}
+                </p>
+              )}
             </div>
           </div>
 
@@ -257,79 +353,39 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 <div>
                   <Label htmlFor="buying_price">Prix d'Achat (DA)</Label>
                   <Input
-                    disabled={!user?.can_edit_selling_price}
+                    disabled={!user?.can_edit_selling_price || isLoading}
                     id="buying_price"
                     type="number"
                     step="0.01"
                     min="0"
                     {...register("buying_price", { valueAsNumber: true })}
                   />
+                  {errors.buying_price && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.buying_price.message}
+                    </p>
+                  )}
                 </div>
               )}
 
               <div>
                 <Label htmlFor="selling_price">Prix de Vente (DA)</Label>
                 <Input
-                  disabled={!user?.can_edit_buying_price}
+                  disabled={!user?.can_edit_buying_price || isLoading}
                   id="selling_price"
                   type="number"
                   step="0.01"
                   min="0"
                   {...register("selling_price", { valueAsNumber: true })}
                 />
+                {errors.selling_price && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.selling_price.message}
+                  </p>
+                )}
               </div>
             </div>
-
-            {/* Profit Calculation */}
-            {/* {(buyingPrice > 0 || sellingPrice > 0) && (
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-medium mb-2">Calcul de Marge</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-600">Bénéfice/unité:</span>
-                    <div className="font-medium">
-                      {profitPerUnit.toFixed(2)} DA
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Marge bénéficiaire:</span>
-                    <div className="font-medium">
-                      {profitMargin.toFixed(2)} %
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )} */}
           </div>
-
-          {/* Current Values Display (for update) */}
-          {/* {product && (
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <h4 className="font-medium text-blue-800 mb-2">
-                Valeurs Actuelles
-              </h4>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="text-blue-600">Stock actuel:</span>
-                  <div className="font-medium">
-                    {product.quantity} {product.unit || "-"}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-blue-600">Prix d'achat actuel:</span>
-                  <div className="font-medium">
-                    {parseFloat(product.buying_price).toFixed(2)} DA
-                  </div>
-                </div>
-                <div>
-                  <span className="text-blue-600">Prix de vente actuel:</span>
-                  <div className="font-medium">
-                    {parseFloat(product.selling_price).toFixed(2)} DA
-                  </div>
-                </div>
-              </div>
-            </div>
-          )} */}
 
           {/* Form Information */}
           <div className="bg-gray-50 p-3 rounded-lg">
@@ -340,11 +396,22 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
           {/* Actions */}
           <div className="flex justify-end space-x-4">
-            <Button type="button" variant="outline" onClick={handleClose}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={isLoading}
+            >
               Annuler
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Enregistrement..." : product ? "Modifier" : "Créer"}
+              {isLoading
+                ? product
+                  ? "Modification..."
+                  : "Création..."
+                : product
+                ? "Modifier"
+                : "Créer"}
             </Button>
           </div>
         </form>

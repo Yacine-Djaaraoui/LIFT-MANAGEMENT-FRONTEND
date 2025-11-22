@@ -4,6 +4,7 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import { useLogin } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import logo from "@/assets/kr7_logo-1-removebg-preview.png";
 
 const loginSchema = yup.object({
   username: yup.string().required("Le nom d'utilisateur est requis"),
@@ -35,23 +36,7 @@ export const Login: React.FC = () => {
         navigate("/statistics");
       },
       onError: (err: any) => {
-        console.error("Login error:", err);
-
-        if (err.response?.data?.detail) {
-          setError(err.response.data.detail);
-        } else if (err.response?.data) {
-          // Handle Django REST framework error structure
-          const errorData = err.response.data;
-          if (typeof errorData === "string") {
-            setError(errorData);
-          } else if (errorData.non_field_errors) {
-            setError(errorData.non_field_errors[0]);
-          } else {
-            setError("Nom d'utilisateur ou mot de passe incorrect");
-          }
-        } else {
-          setError("Erreur de connexion au serveur");
-        }
+        setError(err.message);
       },
     });
   };
@@ -60,6 +45,7 @@ export const Login: React.FC = () => {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
         <div className="text-center mb-8">
+          <img src={logo} alt="" className="w-40 mx-auto" />
           <h1 className="text-2xl font-bold text-gray-800">EURL KR7 FIBRE</h1>
           <p className="text-gray-600 mt-2">Connectez-vous à votre compte</p>
         </div>

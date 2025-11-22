@@ -1,6 +1,15 @@
 import React, { useState } from "react";
 import { useClients, useDeleteClient } from "@/hooks/useClients";
-import { Plus, Search, Edit, Trash2, Building, User } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  Building,
+  User,
+  CheckCircle,
+  XCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,11 +38,14 @@ export const Clients: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<any>(null);
+  const [successMessage, setSuccessMessage] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
   const {
     data: clientsData,
     isLoading,
     error,
+    refetch,
   } = useClients({
     search: searchTerm,
     page: currentPage.toString(),
@@ -43,8 +55,37 @@ export const Clients: React.FC = () => {
 
   const deleteMutation = useDeleteClient();
 
-  const handleDelete = (id: string) => {
-    deleteMutation.mutate(id);
+  const showMessage = (message: string, type: "success" | "error") => {
+    if (type === "success") {
+      setSuccessMessage(message);
+      setErrorMessage("");
+    } else {
+      setErrorMessage(message);
+      setSuccessMessage("");
+    }
+
+    // Auto hide after 5 seconds
+    setTimeout(() => {
+      if (type === "success") {
+        setSuccessMessage("");
+      } else {
+        setErrorMessage("");
+      }
+    }, 5000);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteMutation.mutateAsync(id);
+      showMessage("Client supprimé avec succès", "success");
+      refetch();
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Erreur lors de la suppression du client";
+      showMessage(message, "error");
+    }
   };
 
   const handleEdit = (client: any) => {
@@ -57,21 +98,56 @@ export const Clients: React.FC = () => {
     setIsFormOpen(true);
   };
 
-  const handleFormClose = () => {
+  const handleFormClose = (success: boolean = false) => {
     setIsFormOpen(false);
     setEditingClient(null);
+    if (success) {
+      refetch();
+    }
   };
 
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
-        Erreur lors du chargement des clients
-      </div>
+  const handleFormSuccess = () => {
+    handleFormClose(true);
+    showMessage(
+      editingClient ? "Client modifié avec succès" : "Client créé avec succès",
+      "success"
     );
-  }
+  };
 
-  return (
+  // Clear messages when search term changes
+  React.useEffect(() => {
+    setSuccessMessage("");
+    setErrorMessage("");
+  }, [searchTerm]);
+
+  // Show error from useClients hook
+  React.useEffect(() => {
+    if (error) {
+      showMessage(
+        error.message || "Erreur lors du chargement des clients",
+        "error"
+      );
+    }
+  }, [error]);
+
+  return (  
     <div className="space-y-6">
+      {/* Success Message */}
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded flex items-center">
+          <CheckCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+          <p className="text-sm">{successMessage}</p>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {errorMessage && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded flex items-center">
+          <XCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+          <p className="text-sm">{errorMessage}</p>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">
           Gestion des Clients
@@ -142,8 +218,11 @@ export const Clients: React.FC = () => {
               </>
             ) : clientsData?.results?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-4">
-                  Aucun client trouvé
+                <TableCell colSpan={7} className="text-center py-8">
+                  <div className="flex flex-col items-center text-gray-500">
+                    <Search className="w-12 h-12 mb-2" />
+                    <p>Aucun client trouvé</p>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -179,8 +258,11 @@ export const Clients: React.FC = () => {
                         {client.address.street && (
                           <div>{client.address.street}</div>
                         )}
+                        {client.address.province && (
+                          <span>{client.address.province}</span>
+                        )}
                         {client.address.city && (
-                          <div>{client.address.city}</div>
+                          <span>{" , "}{client.address.city}</span>
                         )}
                       </div>
                     ) : (
@@ -201,7 +283,11 @@ export const Clients: React.FC = () => {
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="sm">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={deleteMutation.isPending}
+                          >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </AlertDialogTrigger>
@@ -216,12 +302,19 @@ export const Clients: React.FC = () => {
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogCancel
+                              disabled={deleteMutation.isPending}
+                            >
+                              Annuler
+                            </AlertDialogCancel>
                             <AlertDialogAction
                               onClick={() => handleDelete(client.id)}
                               className="bg-red-600 hover:bg-red-700"
+                              disabled={deleteMutation.isPending}
                             >
-                              Supprimer
+                              {deleteMutation.isPending
+                                ? "Suppression..."
+                                : "Supprimer"}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
@@ -266,6 +359,7 @@ export const Clients: React.FC = () => {
       <ClientForm
         open={isFormOpen}
         onClose={handleFormClose}
+        onSuccess={handleFormSuccess}
         client={editingClient}
       />
     </div>

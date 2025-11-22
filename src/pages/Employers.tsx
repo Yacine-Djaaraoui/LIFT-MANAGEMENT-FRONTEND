@@ -1,6 +1,15 @@
 import React, { useState } from "react";
 import { useEmployers, useDeleteEmployer } from "@/hooks/useEmployers";
-import { Plus, Search, Edit, Trash2, Filter, X } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  Filter,
+  X,
+  CheckCircle,
+  XCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +49,8 @@ export const Employers: React.FC = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingEmployer, setEditingEmployer] = useState<any>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
   // Only pass group to API if it's not empty and not "all"
   const apiGroup =
@@ -50,6 +61,7 @@ export const Employers: React.FC = () => {
     data: employersData,
     isLoading,
     error,
+    refetch,
   } = useEmployers({
     search: searchTerm,
     group: apiGroup,
@@ -66,8 +78,37 @@ export const Employers: React.FC = () => {
 
   const deleteMutation = useDeleteEmployer();
 
-  const handleDelete = (id: string) => {
-    deleteMutation.mutate(id);
+  const showMessage = (message: string, type: "success" | "error") => {
+    if (type === "success") {
+      setSuccessMessage(message);
+      setErrorMessage("");
+    } else {
+      setErrorMessage(message);
+      setSuccessMessage("");
+    }
+
+    // Auto hide after 5 seconds
+    setTimeout(() => {
+      if (type === "success") {
+        setSuccessMessage("");
+      } else {
+        setErrorMessage("");
+      }
+    }, 5000);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteMutation.mutateAsync(id);
+      showMessage("Employé supprimé avec succès", "success");
+      refetch();
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Erreur lors de la suppression de l'employé";
+      showMessage(message, "error");
+    }
   };
 
   const handleEdit = (employer: any) => {
@@ -83,6 +124,12 @@ export const Employers: React.FC = () => {
   const handleFormClose = () => {
     setIsFormOpen(false);
     setEditingEmployer(null);
+  };
+
+  const handleFormSuccess = (message: string) => {
+    handleFormClose();
+    showMessage(message, "success");
+    refetch();
   };
 
   const handleFilterChange = (key: string, value: string) => {
@@ -103,6 +150,22 @@ export const Employers: React.FC = () => {
     setCurrentPage(1);
   };
 
+  // Clear messages when search term or filters change
+  React.useEffect(() => {
+    setSuccessMessage("");
+    setErrorMessage("");
+  }, [searchTerm, selectedGroup]);
+
+  // Show error from useEmployers hook
+  React.useEffect(() => {
+    if (error) {
+      showMessage(
+        error.message || "Erreur lors du chargement des employés",
+        "error"
+      );
+    }
+  }, [error]);
+
   // Extract unique groups from ALL employers data (not filtered)
   const availableGroups = React.useMemo(() => {
     if (!allEmployersData?.results) return [];
@@ -122,16 +185,24 @@ export const Employers: React.FC = () => {
 
   const hasActiveFilters = searchTerm !== "" || selectedGroup !== "all";
 
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
-        Erreur lors du chargement des employés
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {/* Success Message */}
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded flex items-center">
+          <CheckCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+          <p className="text-sm">{successMessage}</p>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {errorMessage && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded flex items-center">
+          <XCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+          <p className="text-sm">{errorMessage}</p>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">
           Gestion des Employés
@@ -264,10 +335,15 @@ export const Employers: React.FC = () => {
               </>
             ) : employersData?.results?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-4">
-                  {hasActiveFilters
-                    ? "Aucun employé ne correspond aux critères de recherche"
-                    : "Aucun employé trouvé"}
+                <TableCell colSpan={7} className="text-center py-8">
+                  <div className="flex flex-col items-center text-gray-500">
+                    <Search className="w-12 h-12 mb-2" />
+                    <p>
+                      {hasActiveFilters
+                        ? "Aucun employé ne correspond aux critères de recherche"
+                        : "Aucun employé trouvé"}
+                    </p>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -317,6 +393,7 @@ export const Employers: React.FC = () => {
                             variant="outline"
                             size="sm"
                             className="flex items-center justify-center w-8 h-8 p-0"
+                            disabled={deleteMutation.isPending}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -333,12 +410,19 @@ export const Employers: React.FC = () => {
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogCancel
+                              disabled={deleteMutation.isPending}
+                            >
+                              Annuler
+                            </AlertDialogCancel>
                             <AlertDialogAction
                               onClick={() => handleDelete(employer.id)}
                               className="bg-red-600 hover:bg-red-700"
+                              disabled={deleteMutation.isPending}
                             >
-                              Supprimer
+                              {deleteMutation.isPending
+                                ? "Suppression..."
+                                : "Supprimer"}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
@@ -383,6 +467,7 @@ export const Employers: React.FC = () => {
       <EmployerForm
         open={isFormOpen}
         onClose={handleFormClose}
+        onSuccess={handleFormSuccess}
         employer={editingEmployer}
       />
     </div>

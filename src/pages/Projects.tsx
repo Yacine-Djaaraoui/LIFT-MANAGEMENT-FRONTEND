@@ -122,6 +122,8 @@ export const Projects: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedWilayas, setSelectedWilayas] = useState<string[]>([]);
   const [wilayaSearch, setWilayaSearch] = useState("");
+  const [successMessage, setSuccessMessage] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
   // Filters state - use "all" for empty values like calendar
   const [filters, setFilters] = useState({
@@ -142,12 +144,36 @@ export const Projects: React.FC = () => {
     city: selectedWilayas.length > 0 ? selectedWilayas : undefined,
   };
 
-  const { data: projectsData, isLoading, error } = useProjects(apiParams);
+  const {
+    data: projectsData,
+    isLoading,
+    error,
+    refetch,
+  } = useProjects(apiParams);
 
   const deleteMutation = useDeleteProject();
   const verifyMutation = useVerifyProject();
   const unverifyMutation = useUnVerifyProject();
   const updateInvoiceStatusMutation = useUpdateInvoiceStatus();
+
+  const showMessage = (message: string, type: "success" | "error") => {
+    if (type === "success") {
+      setSuccessMessage(message);
+      setErrorMessage("");
+    } else {
+      setErrorMessage(message);
+      setSuccessMessage("");
+    }
+
+    // Auto hide after 5 seconds
+    setTimeout(() => {
+      if (type === "success") {
+        setSuccessMessage("");
+      } else {
+        setErrorMessage("");
+      }
+    }, 5000);
+  };
 
   // Status translation function
   const translateStatus = (status: string) => {
@@ -160,59 +186,44 @@ export const Projects: React.FC = () => {
     return statusMap[status] || status;
   };
 
-  const handleDelete = (id: string) => {
-    deleteMutation.mutate(id);
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteMutation.mutateAsync(id);
+      showMessage("Projet supprimé avec succès", "success");
+      refetch();
+    } catch (error: any) {
+      const message =
+        error?.message || "Erreur lors de la suppression du projet";
+      showMessage(message, "error");
+    }
   };
 
   const handleVerifyToggle = async (project: any) => {
     try {
       if (project.is_verified) {
-        // Unverify project and revert invoice to draft
-        console.log(
-          "Unverifying project and reverting invoice to draft",
-          project.id,
-          project.invoices[0]
-        );
         await unverifyMutation.mutateAsync(project.id);
-
-        // Update invoice status to revert_to_draft
         if (project.invoices[0]) {
-          console.log(
-            "Updating invoice status to revert_to_draft for invoice:",
-            project.invoices[0]
-          );
           await updateInvoiceStatusMutation.mutateAsync({
             id: project.invoices[0],
             action: "revert_to_draft",
           });
-        } else {
-          console.warn("No invoice_id found for project:", project.id);
         }
+        showMessage("Projet dévérifié avec succès", "success");
       } else {
-        // Verify project and issue invoice
-        console.log(
-          "Verifying project and issuing invoice",
-          project.id,
-          project.invoices[0]
-        );
         await verifyMutation.mutateAsync(project.id);
-
-        // Update invoice status to issue
         if (project.invoices[0]) {
-          console.log(
-            "Updating invoice status to issue for invoice:",
-            project.invoices[0]
-          );
           await updateInvoiceStatusMutation.mutateAsync({
             id: project.invoices[0],
             action: "issue",
           });
-        } else {
-          console.warn("No invoice_id found for project:", project.id);
         }
+        showMessage("Projet vérifié avec succès", "success");
       }
-    } catch (error) {
-      console.error("Error toggling project verification:", error);
+      refetch();
+    } catch (error: any) {
+      const message =
+        error?.message || "Erreur lors de la vérification du projet";
+      showMessage(message, "error");
     }
   };
 
@@ -318,16 +329,34 @@ export const Projects: React.FC = () => {
     filters.status !== "all" ||
     selectedWilayas.length > 0;
 
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
-        Erreur lors du chargement des projets
-      </div>
-    );
-  }
+  // Show error from useProjects hook
+  React.useEffect(() => {
+    if (error) {
+      showMessage(
+        error.message || "Erreur lors du chargement des projets",
+        "error"
+      );
+    }
+  }, [error]);
 
   return (
     <div className="space-y-6">
+      {/* Success Message */}
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded flex items-center">
+          <CheckCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+          <p className="text-sm">{successMessage}</p>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {errorMessage && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded flex items-center">
+          <XCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+          <p className="text-sm">{errorMessage}</p>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">
           Gestion des Projets
@@ -552,8 +581,11 @@ export const Projects: React.FC = () => {
               </>
             ) : projectsData?.results?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-4">
-                  Aucun projet trouvé
+                <TableCell colSpan={8} className="text-center py-8">
+                  <div className="flex flex-col items-center text-gray-500">
+                    <Search className="w-12 h-12 mb-2" />
+                    <p>Aucun projet trouvé</p>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -707,6 +739,15 @@ export const Projects: React.FC = () => {
       <ProjectForm
         open={isFormOpen}
         onClose={handleFormClose}
+        onSuccess={() => {
+          showMessage(
+            editingProject
+              ? "Projet modifié avec succès"
+              : "Projet créé avec succès",
+            "success"
+          );
+          refetch();
+        }}
         project={editingProject}
       />
 

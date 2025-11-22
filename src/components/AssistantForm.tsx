@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AlertCircle, CheckCircle } from "lucide-react";
 
 const assistantSchema = yup.object({
   username: yup.string().optional(),
@@ -38,12 +39,14 @@ interface AssistantFormProps {
   open: boolean;
   onClose: () => void;
   assistant?: any;
+  onSuccess?: () => void;
 }
 
 export const AssistantForm: React.FC<AssistantFormProps> = ({
   open,
   onClose,
   assistant,
+  onSuccess,
 }) => {
   const createMutation = useCreateAssistant();
   const updateMutation = useUpdateAssistant();
@@ -55,7 +58,7 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
     reset,
     setValue,
     watch,
-    getValues,
+    setError,
   } = useForm<AssistantFormData>({
     resolver: yupResolver(assistantSchema),
     defaultValues: {
@@ -141,6 +144,7 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
         can_edit_buying_price: data.can_edit_buying_price,
       });
 
+      let result;
       if (assistant) {
         // UPDATE MODE - Send only changed fields
         const submitData: any = {};
@@ -179,7 +183,7 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
 
         console.log("Updating assistant with data:", submitData);
 
-        await updateMutation.mutateAsync({
+        result = await updateMutation.mutateAsync({
           id: assistant.id,
           data: submitData,
         });
@@ -203,21 +207,67 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
         if (data.wilaya) createData.wilaya = data.wilaya;
 
         console.log("Creating assistant with data:", createData);
-        await createMutation.mutateAsync(createData);
+        result = await createMutation.mutateAsync(createData);
       }
 
       handleClose();
-    } catch (error) {
-      console.error("Error saving assistant:", error);
+
+      // Call onSuccess callback if provided
+      if (onSuccess && result) {
+        onSuccess();
+      }
+    } catch (error: any) {
+      // Handle backend validation errors
+      const backendErrors = error?.response?.data;
+
+      if (backendErrors) {
+        // Set form errors for field-specific validation
+        Object.keys(backendErrors).forEach((field) => {
+          if (field in assistantSchema.fields) {
+            setError(field as keyof AssistantFormData, {
+              type: "server",
+              message: Array.isArray(backendErrors[field])
+                ? backendErrors[field][0]
+                : backendErrors[field],
+            });
+          }
+        });
+
+        // Show general error message if no field-specific errors
+        if (
+          !Object.keys(backendErrors).some(
+            (field) => field in assistantSchema.fields
+          )
+        ) {
+          const generalError =
+            backendErrors.message ||
+            backendErrors.detail ||
+            "Une erreur est survenue lors de l'enregistrement";
+          setError("root", {
+            type: "server",
+            message: generalError,
+          });
+        }
+      } else {
+        // Handle network or other errors
+        setError("root", {
+          type: "server",
+          message: error?.message || "Une erreur réseau est survenue",
+        });
+      }
     }
   };
 
   const handleClose = () => {
+    // Reset mutations when closing
+    createMutation.reset();
+    updateMutation.reset();
     reset();
     onClose();
   };
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
+  const currentMutation = assistant ? updateMutation : createMutation;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -227,6 +277,26 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
             {assistant ? "Modifier l'Assistant" : "Créer un Nouvel Assistant"}
           </DialogTitle>
         </DialogHeader>
+
+        {/* General Error Alert */}
+        {errors.root && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded flex items-center">
+            <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+            <p className="text-sm">{errors.root.message}</p>
+          </div>
+        )}
+
+        {/* Success Message */}
+        {currentMutation.isSuccess && (
+          <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded flex items-center">
+            <CheckCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+            <p className="text-sm">
+              {assistant
+                ? "Assistant modifié avec succès"
+                : "Assistant créé avec succès"}
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -238,6 +308,7 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
                 id="username"
                 {...register("username")}
                 placeholder="Nom d'utilisateur"
+                disabled={isLoading}
               />
               {errors.username && (
                 <p className="text-red-500 text-sm mt-1">
@@ -260,6 +331,7 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
                 placeholder={
                   assistant ? "Nouveau mot de passe" : "Mot de passe"
                 }
+                disabled={isLoading}
               />
               {errors.password && (
                 <p className="text-red-500 text-sm mt-1">
@@ -280,6 +352,7 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
                 type="email"
                 {...register("email")}
                 placeholder="email@exemple.com"
+                disabled={isLoading}
               />
               {errors.email && (
                 <p className="text-red-500 text-sm mt-1">
@@ -299,6 +372,7 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
                 id="phone_number"
                 {...register("phone_number")}
                 placeholder="Numéro de téléphone"
+                disabled={isLoading}
               />
               {assistant && (
                 <p className="text-xs text-gray-500 mt-1">
@@ -313,6 +387,7 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
                 id="first_name"
                 {...register("first_name")}
                 placeholder="Prénom"
+                disabled={isLoading}
               />
               {assistant && (
                 <p className="text-xs text-gray-500 mt-1">
@@ -327,6 +402,7 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
                 id="last_name"
                 {...register("last_name")}
                 placeholder="Nom"
+                disabled={isLoading}
               />
               {assistant && (
                 <p className="text-xs text-gray-500 mt-1">
@@ -337,7 +413,12 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
 
             <div>
               <Label htmlFor="wilaya">Wilaya</Label>
-              <Input id="wilaya" {...register("wilaya")} placeholder="Wilaya" />
+              <Input
+                id="wilaya"
+                {...register("wilaya")}
+                placeholder="Wilaya"
+                disabled={isLoading}
+              />
               {assistant && (
                 <p className="text-xs text-gray-500 mt-1">
                   Laisser vide pour garder la valeur actuelle
@@ -360,6 +441,7 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
                       checked as boolean
                     )
                   }
+                  disabled={isLoading}
                 />
                 <Label
                   htmlFor="can_see_selling_price"
@@ -379,7 +461,7 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
                       checked as boolean
                     )
                   }
-                  disabled={!canSeeSellingPrice}
+                  disabled={!canSeeSellingPrice || isLoading}
                 />
                 <Label
                   htmlFor="can_edit_selling_price"
@@ -406,6 +488,7 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
                       checked as boolean
                     )
                   }
+                  disabled={isLoading}
                 />
                 <Label
                   htmlFor="can_edit_buying_price"
@@ -414,18 +497,6 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
                   Peut modifier le prix d'achat
                 </Label>
               </div>
-            </div>
-
-            {/* Current Values Display (for debugging) */}
-            <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-md">
-              <p className="text-sm text-gray-700">
-                <strong>Valeurs actuelles des permissions:</strong>
-                <div className="mt-1 text-xs">
-                  Voir prix vente: {canSeeSellingPrice ? "Oui" : "Non"} |
-                  Modifier prix vente: {canEditSellingPrice ? "Oui" : "Non"} |
-                  Modifier prix achat: {canEditBuyingPrice ? "Oui" : "Non"}
-                </div>
-              </p>
             </div>
 
             {/* Permissions Help Text */}
@@ -450,7 +521,12 @@ export const AssistantForm: React.FC<AssistantFormProps> = ({
           </div>
 
           <div className="flex justify-end space-x-4">
-            <Button type="button" variant="outline" onClick={handleClose}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={isLoading}
+            >
               Annuler
             </Button>
             <Button type="submit" disabled={isLoading}>

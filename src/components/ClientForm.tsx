@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Search } from "lucide-react";
+import { Search, AlertCircle, CheckCircle } from "lucide-react";
 
 // Algerian wilayas (provinces) - same list as in calendar
 const ALGERIAN_WILAYAS = [
@@ -163,7 +163,7 @@ interface ClientFormProps {
   open: boolean;
   onClose: () => void;
   client?: any;
-  onSuccess?: (client: any) => void; // New prop for success callback
+  onSuccess?: (client: any) => void;
 }
 
 export const ClientForm: React.FC<ClientFormProps> = ({
@@ -184,6 +184,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
     reset,
     watch,
     setValue,
+    setError,
   } = useForm<ClientFormData>({
     resolver: yupResolver(clientSchema),
     defaultValues: {
@@ -219,7 +220,6 @@ export const ClientForm: React.FC<ClientFormProps> = ({
   // Reset form with client data when client changes or dialog opens
   useEffect(() => {
     if (open && client) {
-      console.log("Editing client:", client); // Debug log
       reset({
         name: client.name || "",
         phone_number: client.phone_number || "",
@@ -282,13 +282,11 @@ export const ClientForm: React.FC<ClientFormProps> = ({
 
   const onSubmit = async (data: ClientFormData) => {
     try {
-      console.log("Form data submitted:", data); // Debug log
-
       // Prepare data for API - convert empty strings to null for all fields
       const apiData: any = {
         name: data.name,
         phone_number: data.phone_number,
-        is_corporate: data.is_corporate, // This should now be correct
+        is_corporate: data.is_corporate,
         email: data.email || null,
         fax: data.fax || null,
         notes: data.notes || null,
@@ -310,8 +308,6 @@ export const ClientForm: React.FC<ClientFormProps> = ({
         };
       }
 
-      console.log("API data to send:", apiData); // Debug log
-
       let result;
       if (client) {
         result = await updateMutation.mutateAsync({
@@ -328,12 +324,52 @@ export const ClientForm: React.FC<ClientFormProps> = ({
       if (onSuccess && result) {
         onSuccess(result);
       }
-    } catch (error) {
-      console.error("Error saving client:", error);
+    } catch (error: any) {
+      // Handle backend validation errors
+      const backendErrors = error?.response?.data;
+
+      if (backendErrors) {
+        // Set form errors for field-specific validation
+        Object.keys(backendErrors).forEach((field) => {
+          if (field in clientSchema.fields) {
+            setError(field as keyof ClientFormData, {
+              type: "server",
+              message: Array.isArray(backendErrors[field])
+                ? backendErrors[field][0]
+                : backendErrors[field],
+            });
+          }
+        });
+
+        // Show general error message if no field-specific errors
+        if (
+          !Object.keys(backendErrors).some(
+            (field) => field in clientSchema.fields
+          )
+        ) {
+          const generalError =
+            backendErrors.message ||
+            backendErrors.detail ||
+            "Une erreur est survenue";
+          setError("root", {
+            type: "server",
+            message: generalError,
+          });
+        }
+      } else {
+        // Handle network or other errors
+        setError("root", {
+          type: "server",
+          message: error?.message || "Une erreur réseau est survenue",
+        });
+      }
     }
   };
 
   const handleClose = () => {
+    // Reset mutations when closing
+    createMutation.reset();
+    updateMutation.reset();
     reset();
     setWilayaSearch("");
     setShowWilayaDropdown(false);
@@ -341,6 +377,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
   };
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
+  const currentMutation = client ? updateMutation : createMutation;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -352,6 +389,26 @@ export const ClientForm: React.FC<ClientFormProps> = ({
               : "Créer un Nouveau Client"}
           </DialogTitle>
         </DialogHeader>
+
+        {/* General Error Alert */}
+        {errors.root && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded flex items-center">
+            <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+            <p className="text-sm">{errors.root.message}</p>
+          </div>
+        )}
+
+        {/* Success Message */}
+        {currentMutation.isSuccess && (
+          <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded flex items-center">
+            <CheckCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+            <p className="text-sm">
+              {client
+                ? "Client modifié avec succès"
+                : "Client créé avec succès"}
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Basic Information */}
@@ -367,6 +424,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                   id="name"
                   {...register("name")}
                   placeholder="Nom du client"
+                  disabled={isLoading}
                 />
                 {errors.name && (
                   <p className="text-red-500 text-sm mt-1">
@@ -383,6 +441,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                   id="phone_number"
                   {...register("phone_number")}
                   placeholder="Numéro de téléphone"
+                  disabled={isLoading}
                 />
                 {errors.phone_number && (
                   <p className="text-red-500 text-sm mt-1">
@@ -400,6 +459,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                   type="email"
                   {...register("email")}
                   placeholder="email@exemple.com"
+                  disabled={isLoading}
                 />
                 {errors.email && (
                   <p className="text-red-500 text-sm mt-1">
@@ -416,6 +476,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                   id="fax"
                   {...register("fax")}
                   placeholder="Numéro de fax"
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -425,6 +486,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                 id="is_corporate"
                 checked={isCorporate}
                 onCheckedChange={handleCorporateChange}
+                disabled={isLoading}
               />
               <Label htmlFor="is_corporate" className="cursor-pointer">
                 Client Entreprise
@@ -448,31 +510,56 @@ export const ClientForm: React.FC<ClientFormProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="rc">Registre de Commerce (RC)</Label>
-                <Input id="rc" {...register("rc")} placeholder="Numéro RC" />
+                <Input
+                  id="rc"
+                  {...register("rc")}
+                  placeholder="Numéro RC"
+                  disabled={isLoading}
+                />
               </div>
 
               <div>
                 <Label htmlFor="nif">
                   Numéro d'Identification Fiscale (NIF)
                 </Label>
-                <Input id="nif" {...register("nif")} placeholder="Numéro NIF" />
+                <Input
+                  id="nif"
+                  {...register("nif")}
+                  placeholder="Numéro NIF"
+                  disabled={isLoading}
+                />
               </div>
 
               <div>
                 <Label htmlFor="nis">
                   Numéro d'Identification Statistique (NIS)
                 </Label>
-                <Input id="nis" {...register("nis")} placeholder="Numéro NIS" />
+                <Input
+                  id="nis"
+                  {...register("nis")}
+                  placeholder="Numéro NIS"
+                  disabled={isLoading}
+                />
               </div>
 
               <div>
                 <Label htmlFor="ai">Article d'Imposition (AI)</Label>
-                <Input id="ai" {...register("ai")} placeholder="Numéro AI" />
+                <Input
+                  id="ai"
+                  {...register("ai")}
+                  placeholder="Numéro AI"
+                  disabled={isLoading}
+                />
               </div>
 
               <div>
                 <Label htmlFor="art">Numéro ART</Label>
-                <Input id="art" {...register("art")} placeholder="Numéro ART" />
+                <Input
+                  id="art"
+                  {...register("art")}
+                  placeholder="Numéro ART"
+                  disabled={isLoading}
+                />
               </div>
 
               <div>
@@ -483,6 +570,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                   id="account_number"
                   {...register("account_number")}
                   placeholder="Numéro de compte"
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -490,9 +578,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
 
           {/* Address Information */}
           <div className="space-y-4">
-            <h3 className="text-lg font-medium">
-              Adresse 
-            </h3>
+            <h3 className="text-lg font-medium">Adresse</h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -501,6 +587,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                   id="address.province"
                   {...register("address.province")}
                   placeholder="Province"
+                  disabled={isLoading}
                 />
               </div>
 
@@ -513,6 +600,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                     placeholder="Sélectionner une wilaya"
                     readOnly
                     onFocus={() => setShowWilayaDropdown(true)}
+                    disabled={isLoading}
                   />
                   {selectedCity && (
                     <Button
@@ -521,6 +609,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                       size="sm"
                       onClick={clearWilaya}
                       className="absolute right-8 top-0 h-full px-2"
+                      disabled={isLoading}
                     >
                       ×
                     </Button>
@@ -572,6 +661,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                   id="address.street"
                   {...register("address.street")}
                   placeholder="Adresse complète"
+                  disabled={isLoading}
                 />
               </div>
 
@@ -581,6 +671,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                   id="address.postal_code"
                   {...register("address.postal_code")}
                   placeholder="Code postal"
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -596,6 +687,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
               {...register("notes")}
               placeholder="Notes supplémentaires sur le client..."
               rows={4}
+              disabled={isLoading}
             />
           </div>
 
@@ -612,7 +704,12 @@ export const ClientForm: React.FC<ClientFormProps> = ({
 
           {/* Actions */}
           <div className="flex justify-end space-x-4">
-            <Button type="button" variant="outline" onClick={handleClose}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={isLoading}
+            >
               Annuler
             </Button>
             <Button type="submit" disabled={isLoading}>
